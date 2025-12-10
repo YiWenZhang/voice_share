@@ -301,6 +301,8 @@ def toggle_playback(code):
     return redirect(url_for("main.room_detail", code=code))
 
 
+
+
 @main_bp.route("/rooms/<code>/playlist/add", methods=["POST"])
 @login_required
 def add_to_playlist(code):

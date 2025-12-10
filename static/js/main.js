@@ -6,46 +6,52 @@ document.addEventListener("DOMContentLoaded", () => {
   initMusicAutofill();
 });
 
-// --- 1. 统一按钮控制 (终极防失效版) ---
+// --- 1. 统一按钮控制 (修复版：兼容 data-action) ---
 function initGlobalControls() {
   document.body.addEventListener('click', async (e) => {
     // 1. 查找按钮
     const btn = e.target.closest('.control-btn');
     if (!btn) return;
 
-    // 2. 阻止默认行为 (哪怕加了 type="button" 也要阻止)
+    // 2. 阻止默认行为 (防止表单提交刷新)
     e.preventDefault();
     e.stopPropagation();
 
     const form = btn.closest('form');
     if (!form) return;
 
-    console.log("点击了控制按钮:", btn); // 【调试】
-
     // 3. 视觉反馈
+    if (btn.disabled) return;
     const originalOpacity = btn.style.opacity;
+    btn.disabled = true;
     btn.style.opacity = '0.5';
     btn.style.cursor = 'wait';
-    // 暂时禁用防止连点，请求结束后恢复
-    btn.disabled = true;
 
     // 4. 构造数据
-    const formData = new FormData(form);
+    const formData = new FormData();
 
-    // 补全 CSRF (双重保险)
-    if (!formData.has('csrf_token')) {
-        const csrf = document.querySelector('input[name="csrf_token"]');
-        if (csrf) formData.append('csrf_token', csrf.value);
+    // 补全 CSRF
+    if (form) {
+        const csrfInput = form.querySelector('input[name="csrf_token"]');
+        if (csrfInput) formData.append('csrf_token', csrfInput.value);
+    } else {
+        const anyCsrf = document.querySelector('input[name="csrf_token"]');
+        if (anyCsrf) formData.append('csrf_token', anyCsrf.value);
     }
 
-    // [关键] 优先读取 data-action，其次读取 value
+    // [关键修复] 优先读取 data-action，其次 value
     const action = btn.dataset.action || btn.value || btn.getAttribute('value');
-    if (action) {
-        formData.append('action', action);
-        console.log("发送指令:", action); // 【调试】
+    if (action) formData.append('action', action);
+
+    // 补全 Music/Item ID (用于切歌/删除)
+    if (form) {
+        const musicIn = form.querySelector('input[name="music_id"]');
+        if (musicIn) formData.append('music_id', musicIn.value);
+        const itemIn = form.querySelector('input[name="item_id"]');
+        if (itemIn) formData.append('item_id', itemIn.value);
     }
 
-    // 补全 Position
+    // 补全进度
     const audio = document.querySelector('#room-audio');
     let pos = 0;
     if (audio && !isNaN(audio.currentTime)) {
@@ -53,28 +59,33 @@ function initGlobalControls() {
     }
     formData.append('position', pos);
 
+    // 5. 发送请求
+    // 优先用 form.action，没有则用 roomConfig
+    let targetUrl = form.action;
+    if ((!targetUrl || targetUrl === window.location.href) && window.roomConfig) {
+        targetUrl = window.roomConfig.toggleUrl;
+    }
+
     try {
-      const response = await fetch(form.action, {
+      const response = await fetch(targetUrl, {
         method: 'POST',
         body: formData
       });
 
       if (response.ok) {
-        console.log("指令执行成功");
-        // 立即触发同步
+        // 成功！立即触发同步
         if (window.manualRefreshState) await window.manualRefreshState();
       } else {
-        console.error("操作失败，状态码:", response.status);
-        alert("操作失败，请刷新重试");
+        console.error("操作失败:", response.status);
       }
     } catch (err) {
       console.error("网络错误:", err);
     } finally {
-      // 恢复按钮状态
+      // 恢复按钮
       if (btn) {
+        btn.disabled = false;
         btn.style.opacity = originalOpacity || '1';
         btn.style.cursor = 'pointer';
-        btn.disabled = false;
       }
     }
   });
@@ -88,7 +99,11 @@ function initChatControls() {
   chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = chatForm.querySelector('input[name="content"]');
-    if (!input.value.trim()) return;
+    const content = input.value.trim();
+    if (!content) return;
+
+    const btn = chatForm.querySelector('.send-btn');
+    btn.disabled = true;
 
     const formData = new FormData(chatForm);
     try {
@@ -103,6 +118,10 @@ function initChatControls() {
         if(chatLog) chatLog.scrollTop = chatLog.scrollHeight;
       }
     } catch (e) { console.error(e); }
+    finally {
+        btn.disabled = false;
+        input.focus();
+    }
   });
 }
 
@@ -123,6 +142,10 @@ function initRoomSync() {
   const timeDuration = document.querySelector("#time-duration");
   const vinylWrapper = document.querySelector('.vinyl-wrapper');
 
+  // 用于自动切歌的状态
+  let currentPlaylist = [];
+  let currentTrackName = "";
+
   if (audio) {
     audio.addEventListener("timeupdate", () => {
       const current = audio.currentTime || 0;
@@ -134,6 +157,35 @@ function initRoomSync() {
     audio.addEventListener("loadedmetadata", () => {
       if (timeDuration && audio.duration) timeDuration.textContent = formatTime(audio.duration);
     });
+
+    // 自动切歌逻辑
+    audio.addEventListener("ended", () => {
+        if (!isOwner) return;
+        console.log("播放结束，尝试切歌...");
+
+        const currentIndex = currentPlaylist.findIndex(item => item.title === currentTrackName);
+        const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+        const formData = new FormData();
+        formData.append('csrf_token', csrfToken);
+
+        if (currentIndex !== -1 && currentIndex < currentPlaylist.length - 1) {
+            // 下一首
+            const nextMusic = currentPlaylist[currentIndex + 1];
+            formData.append('music_id', nextMusic.music_id);
+            // 这里不需要 action，只要有 music_id 后端就会切歌
+        } else {
+            // 没有下一首，停止
+            formData.append('action', 'stop');
+        }
+
+        // 发送请求
+        fetch(toggleUrl, {
+            method: 'POST',
+            body: formData
+        }).then(async (res) => {
+            if (res.ok && window.manualRefreshState) await window.manualRefreshState();
+        });
+    });
   }
 
   async function refreshState() {
@@ -142,39 +194,64 @@ function initRoomSync() {
       if (!response.ok) return;
       const state = await response.json();
 
+      // 更新本地状态
+      if (state.playlist) currentPlaylist = state.playlist;
+      currentTrackName = state.current_track_name;
+
       // UI 更新
       if (label) label.textContent = state.playback_status === "playing" ? "播放中" : "已暂停";
+
       if (statusDot) {
         statusDot.classList.remove('playing', 'paused');
-        statusDot.classList.add(state.playback_status);
-      }
-      if (trackLabel) {
-        const newTitle = state.current_track_name || "等待播放...";
-        if (trackLabel.textContent.trim() !== newTitle) trackLabel.textContent = newTitle;
+        if (state.current_track_name) statusDot.classList.add(state.playback_status);
       }
 
-      // --- 按钮自动切换 (关键：生成的 HTML 必须带 type="button" 和 data-action) ---
+      if (trackLabel) {
+        if (state.current_track_name) {
+            const newTitle = state.current_track_name;
+            if (trackLabel.textContent.trim() !== newTitle) trackLabel.textContent = newTitle;
+            trackLabel.classList.remove('empty-hint');
+        } else {
+            trackLabel.textContent = "请添加歌曲吧";
+            trackLabel.classList.add('empty-hint');
+        }
+      }
+
+      // --- 按钮自动切换 (关键修复：生成的 HTML 必须带 type="button" 和 data-action) ---
       if (hostBtnWrapper) {
           const currentBtn = hostBtnWrapper.querySelector('.control-btn');
-          if (currentBtn) {
-              const btnAction = currentBtn.dataset.action || currentBtn.value;
 
-              if (state.playback_status === 'playing' && btnAction === 'play') {
-                  // 显示暂停键
-                  hostBtnWrapper.innerHTML = `
-                    <button type="button" class="control-btn pause" data-action="pause" title="全员暂停">
-                      <i class="ri-pause-mini-fill"></i> 暂停全员
-                    </button>`;
-              } else if (state.playback_status !== 'playing' && btnAction === 'pause') {
-                  // 显示播放键
-                  hostBtnWrapper.innerHTML = `
-                    <button type="button" class="control-btn play" data-action="play" title="全员播放">
+          if (!state.current_track_name) {
+              // 没歌时显示灰色播放键
+              if (!currentBtn || currentBtn.classList.contains('pause')) {
+                   hostBtnWrapper.innerHTML = `
+                    <button type="button" class="control-btn play" data-action="play" title="全员播放" disabled style="opacity:0.5; cursor:not-allowed;">
                       <i class="ri-play-mini-fill"></i> 播放全员
                     </button>`;
+              }
+          } else {
+              // 有歌
+              if (currentBtn) {
+                  const btnAction = currentBtn.dataset.action || currentBtn.value;
+
+                  if (state.playback_status === 'playing' && btnAction === 'play') {
+                      // 变成暂停键
+                      hostBtnWrapper.innerHTML = `
+                        <button type="button" class="control-btn pause" data-action="pause" title="全员暂停">
+                          <i class="ri-pause-mini-fill"></i> 暂停全员
+                        </button>`;
+                  } else if (state.playback_status !== 'playing' && btnAction === 'pause') {
+                      // 变成播放键
+                      hostBtnWrapper.innerHTML = `
+                        <button type="button" class="control-btn play" data-action="play" title="全员播放">
+                          <i class="ri-play-mini-fill"></i> 播放全员
+                        </button>`;
+                  }
               }
           }
       }
 
+      // 歌单 & 聊天同步
       if (playlistContainer && state.playlist) {
           updatePlaylistUI(playlistContainer, state.playlist, state.current_track_name, isOwner, toggleUrl, playlistDeleteUrl);
       }
@@ -186,6 +263,7 @@ function initRoomSync() {
             const targetSrc = `/static/uploads/music/${state.current_track_file}`;
             const currentSrcPath = decodeURIComponent(audio.src).split('/static/uploads/music/')[1];
 
+            // 切歌
             if (currentSrcPath !== state.current_track_file) {
               audio.src = targetSrc;
               if (state.current_position > 0) audio.currentTime = state.current_position;
@@ -195,6 +273,7 @@ function initRoomSync() {
               } catch (e) { console.error(e); }
             }
 
+            // 进度修正
             if (state.current_position !== undefined) {
                  const diff = Math.abs(audio.currentTime - state.current_position);
                  if (state.playback_status === "paused") {
@@ -208,6 +287,7 @@ function initRoomSync() {
                  }
             }
 
+            // 状态控制
             if (state.playback_status === "playing") {
                 if (audio.paused) audio.play().catch(()=>{});
                 if (vinylWrapper) vinylWrapper.classList.add('spinning');
@@ -215,6 +295,12 @@ function initRoomSync() {
                 if (!audio.paused) audio.pause();
                 if (vinylWrapper) vinylWrapper.classList.remove('spinning');
             }
+          } else {
+              // Stop 状态：停止并重置
+              if (!audio.paused) audio.pause();
+              audio.currentTime = 0;
+              if (vinylWrapper) vinylWrapper.classList.remove('spinning');
+              if (audio.src) audio.removeAttribute('src');
           }
       }
     } catch (e) { console.error(e); }
@@ -225,7 +311,7 @@ function initRoomSync() {
   setInterval(refreshState, 2000);
 }
 
-// --- 4. 歌单渲染 ---
+// --- 4. 歌单渲染 (确保按钮带 type="button" 和 data-action) ---
 function updatePlaylistUI(container, playlist, currentTrackName, isOwner, toggleUrl, deleteUrl) {
     let html = '';
     const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
@@ -238,7 +324,7 @@ function updatePlaylistUI(container, playlist, currentTrackName, isOwner, toggle
             let actionsHtml = '';
 
             if (isOwner) {
-                // 播放和删除按钮也加上 type="button"
+                // 播放按钮
                 actionsHtml += `
                     <form method="post" action="${toggleUrl}" class="inline-btn-form">
                         <input type="hidden" name="csrf_token" value="${csrfToken}" />
@@ -247,14 +333,19 @@ function updatePlaylistUI(container, playlist, currentTrackName, isOwner, toggle
                             <i class="ri-play-mini-fill"></i>
                         </button>
                     </form>
+                `;
+                // 删除按钮
+                actionsHtml += `
                     <form method="post" action="${deleteUrl}" class="inline-btn-form">
                         <input type="hidden" name="csrf_token" value="${csrfToken}" />
                         <input type="hidden" name="item_id" value="${item.id}" />
                         <button type="button" class="icon-btn-sm danger control-btn" title="删除" data-action="delete">
                             <i class="ri-delete-bin-line"></i>
                         </button>
-                    </form>`;
+                    </form>
+                `;
             }
+
             html += `
                 <div class="playlist-item ${isPlaying ? 'playing' : ''}">
                     <div class="item-info">
@@ -268,7 +359,7 @@ function updatePlaylistUI(container, playlist, currentTrackName, isOwner, toggle
     if (container.innerHTML.trim() !== html.trim()) container.innerHTML = html;
 }
 
-// --- 辅助函数 (保持不变) ---
+// (辅助函数保持不变)
 function updateChatLog(container, messages) {
     const existingItems = container.querySelectorAll('.chat-bubble-row');
     const existingIds = new Set();

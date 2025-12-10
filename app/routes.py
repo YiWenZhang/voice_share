@@ -486,7 +486,8 @@ def toggle_playback(code):
     except (ValueError, TypeError):
         position = None
 
-    if music_id:  # 切歌
+    # 1. 切歌逻辑
+    if music_id:
         music = Music.query.get(music_id)
         if music and music.status == "approved":
             room.current_track_name = music.title
@@ -498,14 +499,22 @@ def toggle_playback(code):
         else:
             flash("无法播放该歌曲", "error")
 
-    elif action in {"play", "pause"}:  # 播放暂停
-        room.playback_status = "playing" if action == "play" else "paused"
-        if position is not None and position >= 0:
-            room.current_position = position
+    # 2. 播放/暂停/停止逻辑
+    elif action in {"play", "pause", "stop"}:
+        if action == "stop":
+            # 【新增】播放结束或清空状态
+            room.playback_status = "paused"
+            room.current_track_name = None  # 清空歌名
+            room.current_track_file = None  # 清空文件
+            room.current_position = 0.0
+        else:
+            room.playback_status = "playing" if action == "play" else "paused"
+            if position is not None and position >= 0:
+                room.current_position = position
+
         room.updated_at = datetime.utcnow()
 
     db.session.commit()
-    # 返回 JSON，配合前端 fetch 使用
     return jsonify({"status": "success"})
 
 

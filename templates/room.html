@@ -124,8 +124,24 @@
       <section class="chat-panel-modern">
         <div class="chat-header"><h3><i class="ri-chat-smile-3-line"></i> 房间互动</h3></div>
         <div class="chat-messages-area" id="chat-log">
-          <div class="no-msg"><i class="ri-chat-1-line"></i><p>加载中...</p></div>
-        </div>
+                  {% for message in messages %}
+                    <div class="chat-bubble-row {{ 'self' if message.author.id == current_user.id }}" data-id="{{ message.id }}">
+                      <img src="{{ message.author.avatar_url }}" class="chat-avatar-sm" />
+                      <div class="chat-content-wrap">
+                        <div class="chat-meta">
+                          <span class="chat-name">{{ message.author.nickname or message.author.username }}</span>
+                          <span class="chat-time">{{ message.created_at.strftime('%H:%M') }}</span>
+                        </div>
+                        <div class="chat-bubble">{{ message.content }}</div>
+                      </div>
+                    </div>
+                  {% else %}
+                    <div class="no-msg">
+                      <i class="ri-chat-1-line"></i>
+                      <p>暂无消息，快来聊天吧</p>
+                    </div>
+                  {% endfor %}
+                </div>
         <div class="chat-input-area">
           <form method="post" action="{{ url_for('main.send_message', code=room.code) }}" class="chat-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />

@@ -173,6 +173,7 @@
   // 这里的配置现在在 main.js 加载之前就会准备好
   window.roomConfig = {
     code: "{{ room.code }}",
+    currentUserId: {{ current_user.id }}, /* [新增] 注入当前用户ID */
     isOwner: {{ 'true' if is_owner else 'false' }},
     isActive: {{ 'true' if room.is_active else 'false' }},
     audioSelector: "#room-audio",

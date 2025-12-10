@@ -393,8 +393,12 @@ function updateChatLog(container, messages) {
 
     messages.forEach(msg => {
         if (!existingIds.has(msg.id)) {
+        // [新增] 判断是否为自己发的消息
+            // 注意：需要确保你的 room.html 已经按第三步修改，注入了 currentUserId
+            const isSelf = (msg.author_id === window.roomConfig.currentUserId);
+            const selfClass = isSelf ? 'self' : '';
             const html = `
-                <div class="chat-bubble-row" data-id="${msg.id}">
+                <div class="chat-bubble-row ${selfClass}" data-id="${msg.id}">
                     <img src="${msg.author_avatar}" class="chat-avatar-sm" />
                     <div class="chat-content-wrap">
                         <div class="chat-meta">

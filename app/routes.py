@@ -396,6 +396,7 @@ def room_state(code):
     recent_msgs.reverse()
     messages_data = [{
         "id": m.id,
+        "author_id": m.author.id,
         "author_name": m.author.nickname or m.author.username,
         "author_avatar": m.author.avatar_url,
         "created_at": m.created_at.strftime('%H:%M'),

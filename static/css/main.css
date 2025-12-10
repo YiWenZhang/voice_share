@@ -2839,3 +2839,26 @@ nav, main, .dashboard-wrapper, .profile-container-wrapper {
     opacity: 0;
   }
 }
+
+
+/* --- 修复聊天框方向 (修正版：自己发的在右边 + 紫色) --- */
+
+/* 1. 强制布局为反向 (靠右显示) */
+.chat-bubble-row.self {
+  flex-direction: row-reverse !important;
+}
+
+/* 2. 强制信息头（名字/时间）靠右对齐 */
+.chat-bubble-row.self .chat-meta {
+  justify-content: flex-end !important;
+}
+
+/* 3. 修正气泡样式 (紫色背景) */
+.chat-bubble-row.self .chat-bubble {
+  background: var(--brand) !important;
+  color: #fff !important;
+
+  /* 修正圆角方向：右上角变尖（指向头像），左上角变圆 */
+  border-top-left-radius: 12px !important;
+  border-top-right-radius: 2px !important;
+}

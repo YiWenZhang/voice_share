@@ -164,7 +164,6 @@
               </div>
               <span class="time-text" id="time-duration">00:00</span>
             </div>
-
             <div class="volume-control">
               <i class="ri-volume-up-line" id="vol-icon"></i>
               <input type="range" class="vol-slider" min="0" max="1" step="0.1" value="1" oninput="adjustVolume(this.value)">
@@ -173,9 +172,9 @@
 
           {% if is_owner %}
             <div class="host-controls-bar">
-              <form method="post" action="{{ url_for('main.toggle_playback', code=room.code) }}" class="control-form">
+              <form class="control-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                <div class="host-btn-group">
+                <div class="host-btn-group" id="host-btn-wrapper">
                   {% if room.playback_status == 'playing' %}
                     <button class="control-btn pause" name="action" value="pause" title="全员暂停">
                       <i class="ri-pause-mini-fill"></i> 暂停全员
@@ -192,7 +191,7 @@
           {% else %}
             <p class="guest-hint"><i class="ri-broadcast-line"></i> 进度由房主统一控制</p>
           {% endif %}
-          </div>
+        </div>
       </section>
 <!--        <div class="player-info">-->
 <!--          <div class="track-status">-->
@@ -338,7 +337,8 @@
     isOwner: {{ 'true' if is_owner else 'false' }},
     isActive: {{ 'true' if room.is_active else 'false' }},
     audioSelector: "#room-audio",
-    stateUrl: "{{ url_for('main.room_state', code=room.code) }}"
+    stateUrl: "{{ url_for('main.room_state', code=room.code) }}",
+    toggleUrl: "{{ url_for('main.toggle_playback', code=room.code) }}"
   };
 </script>
 {% endblock %}

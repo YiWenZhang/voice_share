@@ -246,7 +246,7 @@ def room_detail(code):
         messages=messages,
     )
 
-
+'''
 @main_bp.route("/rooms/<code>/state")
 @login_required
 def room_state(code):
@@ -300,8 +300,7 @@ def toggle_playback(code):
     db.session.commit()
     return redirect(url_for("main.room_detail", code=code))
 
-
-
+'''
 
 @main_bp.route("/rooms/<code>/playlist/add", methods=["POST"])
 @login_required
@@ -418,3 +417,78 @@ def records():
         .all()
     )
     return render_template("records.html", listen_records=listen_records, room_records=room_records)
+
+
+# app/routes.py
+
+# app/routes.py
+
+@main_bp.route("/rooms/<code>/state")
+@login_required
+def room_state(code):
+    room = Room.query.filter_by(code=code).first_or_404()
+    if not room.is_active and room.owner_id != current_user.id:
+        abort(403)
+
+    # 【核心修复】动态计算当前播放进度
+    # 如果是播放状态，当前进度 = 记录的断点 + (现在时间 - 动作发生时间)
+    current_pos = room.current_position
+    if room.playback_status == 'playing' and room.updated_at:
+        # datetime.utcnow() 必须与 models.py 中的 default 一致
+        elapsed = (datetime.utcnow() - room.updated_at).total_seconds()
+        current_pos += elapsed
+
+    return jsonify(
+        {
+            "playback_status": room.playback_status,
+            "current_track_name": room.current_track_name,
+            "current_track_file": room.current_track_file,
+            "current_position": current_pos,
+            "is_active": room.is_active,
+            "updated_at": room.updated_at.isoformat() if room.updated_at else None,
+        }
+    )
+
+
+@main_bp.route("/rooms/<code>/toggle", methods=["POST"])
+@login_required
+def toggle_playback(code):
+    room = Room.query.filter_by(code=code).first_or_404()
+    if room.owner_id != current_user.id:
+        abort(403)
+
+    music_id = request.form.get("music_id")
+    action = request.form.get("action")
+
+    try:
+        position = request.form.get("position", type=float)
+    except (ValueError, TypeError):
+        position = None
+
+    # 1. 切歌
+    if music_id:
+        music = Music.query.get(music_id)
+        if music and music.status == "approved":
+            room.current_track_name = music.title
+            room.current_track_file = music.stored_filename
+            room.playback_status = "playing"
+            room.current_position = 0.0
+            # 【重要】显式更新时间戳，作为计时的起点
+            room.updated_at = datetime.utcnow()
+
+            record = ListenRecord(user_id=current_user.id, song_name=music.title)
+            db.session.add(record)
+        else:
+            flash("无法播放该歌曲", "error")
+
+    # 2. 播放/暂停
+    elif action in {"play", "pause"}:
+        room.playback_status = "playing" if action == "play" else "paused"
+        if position is not None and position >= 0:
+            room.current_position = position
+        # 【重要】显式更新时间戳
+        room.updated_at = datetime.utcnow()
+
+    db.session.commit()
+    return redirect(url_for("main.room_detail", code=code))
+

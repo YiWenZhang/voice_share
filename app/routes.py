@@ -423,48 +423,6 @@ def records():
 
 # app/routes.py
 
-@main_bp.route("/rooms/<code>/state")
-@login_required
-def room_state(code):
-    room = Room.query.filter_by(code=code).first_or_404()
-    if not room.is_active and room.owner_id != current_user.id:
-        abort(403)
-
-    # 1. 计算播放进度 (保持之前的修复)
-    current_pos = room.current_position
-    if room.playback_status == 'playing' and room.updated_at:
-        elapsed = (datetime.utcnow() - room.updated_at).total_seconds()
-        current_pos += elapsed
-
-    # 2. 【新增】获取最新 50 条消息，供前端轮询同步
-    # 注意：为了效率，只取最近的消息；前端会根据 ID 去重
-    recent_msgs = RoomMessage.query.filter_by(room_id=room.id) \
-        .order_by(RoomMessage.created_at.desc()) \
-        .limit(50).all()
-    # 倒序回来，变成“从旧到新”的时间顺序
-    recent_msgs.reverse()
-
-    messages_data = []
-    for msg in recent_msgs:
-        messages_data.append({
-            "id": msg.id,
-            "author_name": msg.author.nickname or msg.author.username,
-            "author_avatar": msg.author.avatar_url,
-            "created_at": msg.created_at.strftime('%H:%M'),
-            "content": msg.content
-        })
-
-    return jsonify(
-        {
-            "playback_status": room.playback_status,
-            "current_track_name": room.current_track_name,
-            "current_track_file": room.current_track_file,
-            "current_position": current_pos,
-            "is_active": room.is_active,
-            "updated_at": room.updated_at.isoformat() if room.updated_at else None,
-            "messages": messages_data  # 【关键】把消息带回去
-        }
-    )
 
 @main_bp.route("/rooms/<code>/toggle", methods=["POST"])
 @login_required
@@ -524,3 +482,52 @@ def send_message(code):
 
     # 【关键】不再重定向，而是返回 JSON 成功信号
     return jsonify({"status": "success"})
+
+
+@main_bp.route("/rooms/<code>/state")
+@login_required
+def room_state(code):
+    room = Room.query.filter_by(code=code).first_or_404()
+    if not room.is_active and room.owner_id != current_user.id:
+        abort(403)
+
+    # 1. 计算播放进度
+    current_pos = room.current_position
+    if room.playback_status == 'playing' and room.updated_at:
+        elapsed = (datetime.utcnow() - room.updated_at).total_seconds()
+        current_pos += elapsed
+
+    # 2. 获取聊天记录
+    recent_msgs = RoomMessage.query.filter_by(room_id=room.id) \
+        .order_by(RoomMessage.created_at.desc()) \
+        .limit(50).all()
+    recent_msgs.reverse()
+    messages_data = [{
+        "id": m.id,
+        "author_name": m.author.nickname or m.author.username,
+        "author_avatar": m.author.avatar_url,
+        "created_at": m.created_at.strftime('%H:%M'),
+        "content": m.content
+    } for m in recent_msgs]
+
+    # 3. 【新增】获取播放列表数据
+    playlist_items = RoomPlaylist.query.filter_by(room_id=room.id) \
+        .order_by(RoomPlaylist.created_at.asc()).all()
+
+    playlist_data = [{
+        "music_id": item.music.id,
+        "title": item.music.title
+    } for item in playlist_items]
+
+    return jsonify(
+        {
+            "playback_status": room.playback_status,
+            "current_track_name": room.current_track_name,
+            "current_track_file": room.current_track_file,
+            "current_position": current_pos,
+            "is_active": room.is_active,
+            "updated_at": room.updated_at.isoformat() if room.updated_at else None,
+            "messages": messages_data,
+            "playlist": playlist_data  # 【关键】把歌单发给前端
+        }
+    )

@@ -1,28 +1,25 @@
 document.addEventListener("DOMContentLoaded", () => {
   initSliderVerification();
   initGlobalHostControls();
-  initChatControls(); // 【新增】初始化聊天拦截
+  initChatControls();
   initRoomSync();
   initMusicAutofill();
 });
 
-// --- 1. 聊天发送逻辑 (拦截表单，防止刷新) ---
+// --- 1. 聊天发送逻辑 ---
 function initChatControls() {
   const chatForm = document.querySelector('.chat-form');
   if (!chatForm) return;
 
   chatForm.addEventListener('submit', async (e) => {
-    e.preventDefault(); // 阻止默认提交（防止页面刷新！）
-
+    e.preventDefault();
     const input = chatForm.querySelector('input[name="content"]');
     const btn = chatForm.querySelector('.send-btn');
     const content = input.value.trim();
     if (!content) return;
 
-    // 视觉反馈：禁用按钮防止重复发送
     btn.disabled = true;
     btn.style.opacity = '0.5';
-
     const formData = new FormData(chatForm);
 
     try {
@@ -30,25 +27,17 @@ function initChatControls() {
         method: 'POST',
         body: formData
       });
-
       if (response.ok) {
-        // 发送成功：清空输入框
         input.value = '';
-        // 立即触发一次同步，让自己的消息马上显示出来
         if (window.manualRefreshState) await window.manualRefreshState();
-        // 滚动到底部 (可选，updateChatLog 里通常会处理)
         const chatLog = document.querySelector("#chat-log");
         if(chatLog) chatLog.scrollTop = chatLog.scrollHeight;
-      } else {
-        console.error("消息发送失败");
       }
     } catch (err) {
       console.error("网络错误", err);
     } finally {
-      // 恢复按钮
       btn.disabled = false;
       btn.style.opacity = '1';
-      // 保持输入框聚焦，方便继续打字
       input.focus();
     }
   });
@@ -72,10 +61,17 @@ function initGlobalHostControls() {
     formData.append('action', action);
 
     const form = btn.closest('form');
+    // 获取 CSRF Token (优先从当前表单取，取不到从页面其他地方取)
+    let csrfVal = '';
     if (form) {
         const csrf = form.querySelector('input[name="csrf_token"]');
-        if (csrf) formData.append('csrf_token', csrf.value);
+        if (csrf) csrfVal = csrf.value;
     }
+    if (!csrfVal) {
+        const anyCsrf = document.querySelector('input[name="csrf_token"]');
+        if (anyCsrf) csrfVal = anyCsrf.value;
+    }
+    formData.append('csrf_token', csrfVal);
 
     const audio = document.querySelector('#room-audio');
     let pos = 0;
@@ -91,6 +87,8 @@ function initGlobalHostControls() {
       });
       if (response.ok) {
         if (window.manualRefreshState) await window.manualRefreshState();
+      } else {
+          console.error("请求失败", response.status);
       }
     } catch (err) {
       console.error("网络错误:", err);
@@ -103,10 +101,10 @@ function initGlobalHostControls() {
   });
 }
 
-// --- 3. 房间同步逻辑 ---
+// --- 3. 房间同步逻辑 (核心) ---
 function initRoomSync() {
   if (!window.roomConfig) return;
-  const { stateUrl, audioSelector, isOwner } = window.roomConfig;
+  const { stateUrl, audioSelector, isOwner, toggleUrl } = window.roomConfig;
   const audio = document.querySelector(audioSelector);
 
   const label = document.querySelector("#state-label");
@@ -115,12 +113,14 @@ function initRoomSync() {
   const statusDot = document.querySelector(".status-dot");
   const hostBtnWrapper = document.querySelector("#host-btn-wrapper");
   const chatLog = document.querySelector("#chat-log");
+  const playlistContainer = document.querySelector(".playlist-scroll-area");
 
   const progressFill = document.querySelector("#progress-fill");
   const timeCurrent = document.querySelector("#time-current");
   const timeDuration = document.querySelector("#time-duration");
   const vinylWrapper = document.querySelector('.vinyl-wrapper');
 
+  // 本地进度驱动
   if (audio) {
     audio.addEventListener("timeupdate", () => {
       const current = audio.currentTime || 0;
@@ -141,12 +141,14 @@ function initRoomSync() {
     });
   }
 
+  // 同步状态
   async function refreshState() {
     try {
       const response = await fetch(stateUrl);
       if (!response.ok) return;
       const state = await response.json();
 
+      // UI 更新
       if (label) label.textContent = state.playback_status === "playing" ? "播放中" : "已暂停";
       if (statusDot) {
         statusDot.classList.remove('playing', 'paused');
@@ -161,6 +163,7 @@ function initRoomSync() {
         statusIndicator.className = `status-indicator ${state.is_active ? 'active' : 'closed'}`;
       }
 
+      // 按钮切换
       if (hostBtnWrapper) {
           const currentBtn = hostBtnWrapper.querySelector('.control-btn');
           if (currentBtn) {
@@ -179,11 +182,18 @@ function initRoomSync() {
           }
       }
 
+      // 歌单同步 (修复：动态更新歌单)
+      if (playlistContainer && state.playlist) {
+          updatePlaylistUI(playlistContainer, state.playlist, state.current_track_name, isOwner, toggleUrl);
+      }
+
+      // 音频逻辑
       if (audio && state.is_active) {
           if (state.current_track_file) {
             const targetSrc = `/static/uploads/music/${state.current_track_file}`;
             const currentSrcPath = decodeURIComponent(audio.src).split('/static/uploads/music/')[1];
 
+            // 切歌
             if (currentSrcPath !== state.current_track_file) {
               audio.src = targetSrc;
               if (state.current_position > 0) audio.currentTime = state.current_position;
@@ -193,6 +203,7 @@ function initRoomSync() {
               } catch (e) { console.error(e); }
             }
 
+            // 进度修正
             if (state.current_position !== undefined && state.current_position !== null) {
                  const diff = Math.abs(audio.currentTime - state.current_position);
                  if (state.playback_status === "paused") {
@@ -207,6 +218,7 @@ function initRoomSync() {
                  }
             }
 
+            // 播放控制
             if (state.playback_status === "playing") {
                 if (audio.paused) audio.play().catch(() => {});
                 if (vinylWrapper) vinylWrapper.classList.add('spinning');
@@ -217,7 +229,7 @@ function initRoomSync() {
           }
       }
 
-      // 【关键】处理聊天记录同步
+      // 聊天同步
       if (chatLog && state.messages) updateChatLog(chatLog, state.messages);
 
     } catch (error) {
@@ -230,7 +242,59 @@ function initRoomSync() {
   setInterval(refreshState, 2000);
 }
 
-// --- 4. 聊天渲染 (保持不变) ---
+// --- 4. 歌单渲染 (新增) ---
+function updatePlaylistUI(container, playlist, currentTrackName, isOwner, toggleUrl) {
+    // 简单比对：如果长度或第一首歌ID不同，或者切歌了，则重绘
+    // 为了性能，可以做细致比对，但这里简单起见，直接重绘内容字符串然后比对
+    let html = '';
+
+    // 获取页面上的 CSRF token 供动态表单使用
+    const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+
+    if (playlist.length === 0) {
+        html = '<div class="empty-list-placeholder">队列空空如也</div>';
+    } else {
+        playlist.forEach(item => {
+            const isPlaying = (item.title === currentTrackName);
+            let actionBtn = '';
+
+            // 只有房主显示切歌按钮
+            if (isOwner) {
+                // 注意：动态生成的表单不走 body click 代理，因为它们是新元素
+                // 但我们的 document.body.addEventListener 代理了所有 .control-btn
+                // 这里切歌按钮是 submit，我们只要确保它是 control-btn 或者我们手动 fetch
+                // 简单点：用普通的 form submit，由 body 代理拦截，或者我们给它加上 class="control-btn"
+                // 这里我们构造一个标准的 form
+                actionBtn = `
+                    <form method="post" action="${toggleUrl}" class="playlist-action-form">
+                        <input type="hidden" name="csrf_token" value="${csrfToken}" />
+                        <input type="hidden" name="music_id" value="${item.music_id}" />
+                        <button type="submit" class="icon-btn-sm control-btn" title="切歌">
+                            <i class="ri-play-mini-fill"></i>
+                        </button>
+                    </form>
+                `;
+            }
+
+            html += `
+                <div class="playlist-item ${isPlaying ? 'playing' : ''}">
+                    <div class="item-info">
+                        <span class="item-title">${escapeHtml(item.title)}</span>
+                        ${isPlaying ? '<span class="playing-badge"><i class="ri-volume-up-line"></i></span>' : ''}
+                    </div>
+                    ${actionBtn}
+                </div>
+            `;
+        });
+    }
+
+    // 只有当 HTML 发生变化时才写入 DOM，防止闪烁和滚动条重置
+    if (container.innerHTML.trim() !== html.trim()) {
+        container.innerHTML = html;
+    }
+}
+
+// --- 5. 聊天记录更新 ---
 function updateChatLog(container, messages) {
     const existingItems = container.querySelectorAll('.chat-bubble-row');
     const existingIds = new Set();
@@ -261,7 +325,7 @@ function updateChatLog(container, messages) {
     if (hasNew) container.scrollTop = container.scrollHeight;
 }
 
-// --- 5. 辅助函数 ---
+// --- 6. 辅助函数 ---
 function initSliderVerification() {
   document.querySelectorAll(".slider-verify").forEach((wrapper) => {
     const thumb = wrapper.querySelector(".slider-thumb");

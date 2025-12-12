@@ -60,7 +60,7 @@ def admin_room_view_query():
 @login_required
 def admin_record_view_query():
     _admin_required()
-    # 这里演示一个较复杂的原生连接查询，模拟视图的效果
+    # 连接查询
     sql = text("""
         SELECT 
             lr.id,

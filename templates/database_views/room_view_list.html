@@ -1,56 +1,60 @@
-{% extends "layout.html" %}
-{% block title %}房间热度监控{% endblock %}
+{% extends "admin/dashboard.html" %}
+{% set active_page = 'insights' %}
 
-{% block content %}
-<div class="section-wrapper">
-  <div class="section-header-modern" style="display: flex; justify-content: space-between; align-items: center;">
-    <div>
-        <h1><i class="ri-bar-chart-horizontal-line"></i> 房间活跃度监控</h1>
-        <p style="color: #64748b;">基于 <code>v_room_stats</code> 聚合统计视图</p>
-    </div>
-    <a href="{{ url_for('db_views.admin_query_center') }}" class="secondary-btn small">返回中心</a>
+{% block admin_main %}
+<div class="module-header">
+  <div class="module-title">
+    <h1><i class="ri-bar-chart-horizontal-line" style="color: #ec4899;"></i> 房间活跃度监控</h1>
+    <p>实时监控各房间在线人数聚合统计 (View: <code>v_room_stats</code>)</p>
   </div>
-
-  <div class="grid-card" style="padding: 0; overflow: hidden;">
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead style="background: #f8fafc;">
-            <tr>
-              <th style="padding-left: 1.5rem;">房间号</th>
-              <th>房间名称</th>
-              <th>房主</th>
-              <th>营业状态</th>
-              <th>实时热度 (人数)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in rooms %}
-            <tr>
-              <td style="padding-left: 1.5rem; font-family: monospace; color: #6366f1; font-weight: 600;">#{{ r.code }}</td>
-              <td style="font-weight: 600; color: #1e293b;">{{ r.name }}</td>
-              <td>{{ r.owner_name }}</td>
-              <td>
-                {% if r.is_active %}
-                  <span class="status-tag success">营业中</span>
-                {% else %}
-                  <span class="status-tag closed" style="background: #f1f5f9; color: #94a3b8;">已打烊</span>
-                {% endif %}
-              </td>
-              <td>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="flex: 1; max-width: 100px; height: 6px; background: #f1f5f9; border-radius: 99px; overflow: hidden;">
-                        <div style="width: {{ (r.member_count / 10) * 100 }}%; height: 100%; background: #f59e0b;"></div>
-                    </div>
-                    <span style="font-weight: 600; color: #f59e0b;">{{ r.member_count }}</span>
-                </div>
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" style="text-align: center; padding: 2rem; color: #94a3b8;">暂无数据</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+  <div class="header-status">
+    <a href="{{ url_for('db_views.admin_query_center') }}" class="modern-action-btn" style="background: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.6); padding: 0.6rem 1.2rem; border-radius: 99px; cursor: pointer; color: #475569; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+      <i class="ri-arrow-left-line"></i> 返回中心
+    </a>
   </div>
 </div>
+
+<section class="grid-card">
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="padding-left: 1.5rem;">房间号</th>
+          <th>房间名称</th>
+          <th>房主</th>
+          <th>营业状态</th>
+          <th>实时热度 (人数)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rooms %}
+        <tr>
+          <td style="padding-left: 1.5rem; font-family: monospace; color: #6366f1; font-weight: 700;">#{{ r.code }}</td>
+          <td style="font-weight: 700; color: #1e293b;">{{ r.name }}</td>
+          <td>
+             <span style="color: #64748b; font-weight: 500;">{{ r.owner_name }}</span>
+          </td>
+          <td>
+            {% if r.is_active %}
+              <span style="background: rgba(220, 252, 231, 0.6); color: #166534; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">营业中</span>
+            {% else %}
+              <span style="background: rgba(241, 245, 249, 0.6); color: #94a3b8; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">已打烊</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="flex: 1; max-width: 120px; height: 8px; background: rgba(0,0,0,0.05); border-radius: 99px; overflow: hidden;">
+                    <div style="width: {{ (r.member_count / 10) * 100 }}%; height: 100%; background: linear-gradient(90deg, #f59e0b, #fbbf24); border-radius: 99px;"></div>
+                </div>
+                <span style="font-weight: 700; color: #d97706; font-size: 0.9rem;">{{ r.member_count }}</span>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align: center; padding: 4rem 0; color: #64748b;">暂无数据</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endblock %}

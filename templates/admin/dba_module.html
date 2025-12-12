@@ -1,0 +1,166 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_main %}
+<div class="module-header">
+  <div class="module-title">
+    <h1><i class="{{ icon }}" style="color: #6366f1; font-size: 0.9em; vertical-align: middle;"></i> {{ title }}</h1>
+    <p>{{ subtitle }}</p>
+  </div>
+  <div class="header-status">
+    <span style="background: rgba(16, 185, 129, 0.1); color: #059669; padding: 0.6rem 1.2rem; border-radius: 99px; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.2); display: flex; align-items: center; gap: 6px;">
+      <i class="ri-checkbox-circle-fill"></i> 系统正常
+    </span>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 2.5rem;">
+
+  {% if active_page == 'health' %}
+    {% if indexes %}
+      <div class="dashboard-card" style="grid-column: 1 / -1;">
+        <h3 style="margin-top:0; color:#1e293b; display: flex; align-items: center; gap: 0.5rem;"><i class="ri-file-list-3-line" style="color:#6366f1;"></i> 索引详情报告</h3>
+        {% for table_name, rows in indexes.items() %}
+          <div style="margin-top: 2rem;">
+            <h4 style="margin: 0 0 1rem 0; color: #6366f1; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:0.5rem; display:inline-block;">Table: {{ table_name }}</h4>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead><tr><th>Key Name</th><th>Column</th><th>Unique</th><th>Type</th></tr></thead>
+                <tbody>
+                  {% for row in rows %}
+                  <tr><td>{{ row.Key_name }}</td><td>{{ row.Column_name }}</td><td>{{ 'Yes' if row.Non_unique == 0 else 'No' }}</td><td>{{ row.Index_type }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="dashboard-card">
+        <div class="card-content">
+          <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-heart-pulse-line" style="color: #ef4444; margin-right: 8px;"></i> 索引健康度</h3>
+          <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">全盘扫描核心表 (User, Music, Room)，分析索引命中率、碎片情况及主键完整性，确保数据库高性能运行。</p>
+          <div style="margin-top: auto;">
+              <a href="{{ url_for('admin.db_health') }}" class="modern-action-btn" style="background: linear-gradient(135deg, #ef4444, #f87171); color: #fff; padding: 1rem; text-align: center; display: block; text-decoration: none; border-radius: 12px; font-size: 1rem;">
+                <i class="ri-pulse-line"></i> 开始体检
+              </a>
+          </div>
+        </div>
+      </div>
+      <div class="dashboard-card">
+        <div class="card-content">
+          <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-delete-bin-2-line" style="color: #64748b; margin-right: 8px;"></i> 孤儿数据清理</h3>
+          <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">扫描无效的 MP3 文件引用、无主的房间记录以及断裂的外键关联，释放存储空间。</p>
+          <div style="margin-top: auto;">
+              <button class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; color: #475569; padding: 1rem; width: 100%; border-radius: 12px; font-size: 1rem;">
+                <i class="ri-recycle-line"></i> 扫描垃圾数据
+              </button>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+  {% elif active_page == 'automation' %}
+    <div class="dashboard-card">
+      <div class="card-content">
+        <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-calendar-check-line" style="color: #8b5cf6; margin-right: 8px;"></i> 每日维护任务</h3>
+        <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">
+          调用存储过程 <code>CALL sp_daily_maintenance()</code><br>
+          自动清理 30 天前的临时日志与过期会话。
+        </p>
+        <form method="post" action="{{ url_for('admin.exec_maintenance') }}" style="margin-top: auto;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="modern-action-btn" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); color: #fff; padding: 1rem; width: 100%; border-radius: 12px; font-size: 1rem;">
+            <i class="ri-play-circle-line"></i> 立即执行 (Call SP)
+          </button>
+        </form>
+      </div>
+    </div>
+    <div class="dashboard-card">
+      <div class="card-content">
+        <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-file-search-line" style="color: #3b82f6; margin-right: 8px;"></i> 审计日志</h3>
+        <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">
+          基于触发器 <code>trg_music_delete</code> 自动捕获的敏感操作流水，确保数据变更可追溯。
+        </p>
+        <div style="margin-top: auto;">
+            <a href="{{ url_for('admin.audit_logs') }}" class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; color: #3b82f6; padding: 1rem; width: 100%; border-radius: 12px; display: block; text-align: center; text-decoration: none; font-size: 1rem;">
+              <i class="ri-eye-line"></i> 查看日志表
+            </a>
+        </div>
+      </div>
+    </div>
+
+  {% elif active_page == 'audit_logs_view' %}
+    <div class="dashboard-card" style="grid-column: 1 / -1;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <h3 style="margin:0; color: #1e293b;"><i class="ri-shield-check-line" style="color:#6366f1;"></i> 系统审计流水</h3>
+        <a href="{{ url_for('admin.db_automation') }}" class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; padding: 0.5rem 1rem; text-decoration:none; color: #64748b; border-radius: 8px;">返回</a>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>ID</th><th>操作类型</th><th>表名</th><th>记录ID</th><th>详情</th><th>时间</th></tr></thead>
+          <tbody>
+            {% for log in logs %}
+            <tr><td>{{ log.id }}</td><td><span style="background:rgba(254, 226, 226, 0.5); color:#ef4444; padding:2px 6px; border-radius:4px;">{{ log.action_type }}</span></td><td>{{ log.table_name }}</td><td>{{ log.record_id }}</td><td style="font-family:monospace; font-size:0.9rem;">{{ log.details }}</td><td>{{ log.action_time }}</td></tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center; padding:3rem; color: #94a3b8;">暂无审计记录</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  {% elif active_page == 'security' %}
+    <div class="dashboard-card" style="border: 1px solid rgba(239, 68, 68, 0.3) !important;">
+      <div class="card-content">
+        <h3 style="margin-top: 0; color: #b91c1c;"><i class="ri-error-warning-line" style="margin-right: 8px;"></i> 事务级用户封禁</h3>
+        <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">
+          <span style="background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 700;">ACID 事务</span>
+          原子性执行：锁定用户 <i class="ri-arrow-right-line"></i> 关闭房间 <i class="ri-arrow-right-line"></i> 下架音乐。
+        </p>
+        <form method="post" action="{{ url_for('admin.manage_user_transaction') }}" style="display: flex; gap: 0.8rem; margin-top: auto;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="text" name="target_username" placeholder="输入用户名" class="input-tiny" style="flex:1; padding: 1rem; border-radius: 12px; font-size: 1rem; background: rgba(255,255,255,0.5);">
+          <button class="modern-action-btn" style="background: #ef4444; color: white; padding: 0 1.5rem; border-radius: 12px; font-size: 1rem;">封禁</button>
+        </form>
+      </div>
+    </div>
+    <div class="dashboard-card">
+      <div class="card-content">
+        <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-shield-keyhole-line" style="color: #10b981; margin-right: 8px;"></i> 权限视图</h3>
+        <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">查看当前数据库连接用户的权限分配 (SHOW GRANTS)，确保最小权限原则。</p>
+        <div style="margin-top: auto;">
+            <button class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; color: #10b981; padding: 1rem; width: 100%; border-radius: 12px; font-size: 1rem;">
+              <i class="ri-eye-2-line"></i> 查看权限
+            </button>
+        </div>
+      </div>
+    </div>
+
+  {% elif active_page == 'backup' %}
+    <div class="dashboard-card">
+      <div class="card-content">
+        <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-download-cloud-2-line" style="color: #3b82f6; margin-right: 8px;"></i> 全量备份</h3>
+        <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">生成当前数据库核心表状态的 JSON 快照文件并下载。</p>
+        <div style="margin-top: auto;">
+            <a href="{{ url_for('admin.backup_db') }}" class="modern-action-btn" style="background: linear-gradient(135deg, #3b82f6, #60a5fa); color: #fff; padding: 1rem; width: 100%; border-radius: 12px; display: block; text-align: center; text-decoration: none; font-size: 1rem;">
+              <i class="ri-save-3-fill"></i> 导出快照
+            </a>
+        </div>
+      </div>
+    </div>
+    <div class="dashboard-card">
+      <div class="card-content">
+        <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-upload-cloud-2-line" style="color: #f59e0b; margin-right: 8px;"></i> 数据恢复</h3>
+        <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">上传备份文件，将数据库回滚到指定时间点的状态。</p>
+        <div style="margin-top: auto;">
+            <button class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; color: #f59e0b; padding: 1rem; width: 100%; border-radius: 12px; font-size: 1rem;">
+              <i class="ri-time-line"></i> 上传并回滚
+            </button>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

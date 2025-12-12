@@ -3,6 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_wtf import CSRFProtect
 from pathlib import Path
+from app.create_with_sql import init_db_with_raw_sql
+from sqlalchemy import text
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -33,7 +35,7 @@ def create_app():
     app.register_blueprint(admin_bp)
 
     with app.app_context():
-        db.create_all()
+        init_db_with_raw_sql(db)
 
     return app
 

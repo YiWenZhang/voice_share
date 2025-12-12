@@ -1,6 +1,8 @@
 import os
 from sqlalchemy import text
 from app import create_app, db
+from dotenv import load_dotenv
+load_dotenv()    # 加载环境变量
 
 # 初始化 Flask 应用
 app = create_app()

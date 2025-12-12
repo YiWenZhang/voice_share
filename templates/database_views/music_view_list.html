@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% block title %}音乐库全景{% endblock %}
+
+{% block content %}
+<div class="section-wrapper">
+  <div class="section-header-modern" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1><i class="ri-music-2-line"></i> 全平台音乐库</h1>
+        <p style="color: #64748b;">基于 <code>v_music_full_info</code> 视图的完整数据映射</p>
+    </div>
+    <a href="{{ url_for('db_views.admin_query_center') }}" class="secondary-btn small">返回中心</a>
+  </div>
+
+  <div class="grid-card" style="padding: 0; overflow: hidden;">
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead style="background: #f8fafc;">
+            <tr>
+              <th style="padding-left: 1.5rem;">ID</th>
+              <th>歌曲信息</th>
+              <th>上传者</th>
+              <th>当前状态</th>
+              <th>上传时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in musics %}
+            <tr>
+              <td style="padding-left: 1.5rem; color: #94a3b8; font-family: monospace;">#{{ m.music_id }}</td>
+              <td>
+                <div style="font-weight: 600; color: #1e293b;">{{ m.title }}</div>
+                <div style="font-size: 0.85rem; color: #94a3b8;">{{ m.original_filename }}</div>
+              </td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <div style="width: 24px; height: 24px; background: #e0e7ff; color: #4338ca; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;">
+                      {{ m.uploader_nickname[0] }}
+                  </div>
+                  <div>
+                      <div style="font-size: 0.9rem;">{{ m.uploader_nickname }}</div>
+                      <div style="font-size: 0.75rem; color: #94a3b8;">@{{ m.uploader_name }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                {% if m.status == 'approved' %}
+                  <span class="status-tag success">已发布</span>
+                {% elif m.status == 'pending' %}
+                  <span class="status-tag pending">待审核</span>
+                {% else %}
+                  <span class="status-tag error" title="{{ m.rejection_reason }}">已驳回</span>
+                {% endif %}
+              </td>
+              <td style="color: #64748b;">{{ m.uploaded_at.strftime('%Y-%m-%d') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align: center; padding: 2rem; color: #94a3b8;">暂无数据</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+  </div>
+</div>
+{% endblock %}

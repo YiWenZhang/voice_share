@@ -121,6 +121,50 @@ def init_db_with_raw_sql(db):
             participated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES user(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        
+        
+        # ==========================================
+        # [新增] 实验 1.4 视图定义
+        # 体现思想：
+        # 1. 简化复杂查询：预先定义 Join 连接，上层应用只需查单表。
+        # 2. 安全性：隐藏敏感字段（如密码、具体路径）。
+        # 3. 数据聚合：预先计算统计数据（Count, Sum）。
+        # ==========================================
+
+        # 视图 1: 音乐详情全貌视图 (v_music_full_info)
+        # 作用：将 musics 表与 user 表通过 user_id 连接，用于管理员快速检索。
+        """
+        CREATE OR REPLACE VIEW v_music_full_info AS
+        SELECT 
+            m.id AS music_id,
+            m.title,
+            m.original_filename,
+            m.status,
+            m.uploaded_at,
+            m.rejection_reason,
+            u.id AS uploader_id,
+            u.username AS uploader_name,
+            u.nickname AS uploader_nickname
+        FROM musics m
+        JOIN user u ON m.user_id = u.id;
+        """,
+
+        # 视图 2: 房间热度统计视图 (v_room_stats)
+        # 作用：聚合统计每个房间的当前人数，体现 "Group By" 和聚合函数在视图中的应用。
+        """
+        CREATE OR REPLACE VIEW v_room_stats AS
+        SELECT 
+            r.id AS room_id,
+            r.code,
+            r.name,
+            r.is_active,
+            r.owner_id,
+            (SELECT nickname FROM user WHERE id = r.owner_id) as owner_name,
+            COUNT(rm.user_id) + 1 AS member_count  -- +1 是加上房主自己
+        FROM room r
+        LEFT JOIN room_member rm ON r.id = rm.room_id
+        GROUP BY r.id, r.code, r.name, r.is_active, r.owner_id;
         """
     ]
 

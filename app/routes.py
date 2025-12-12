@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 from sqlalchemy import text
+from .database_views import get_hot_rooms_data
 from flask import (
     Blueprint,
     abort,
@@ -53,10 +54,13 @@ def dashboard():
         current_user.notification_message = None
         db.session.commit()
         flash(pending_notice, "warning")
+    # [新增] 获取热门房间数据 (体现视图聚合作用)
+    hot_rooms = get_hot_rooms_data(limit=4)
     return render_template(
         "dashboard.html",
         room_form=room_form,
         join_form=join_form,
+        hot_rooms=hot_rooms,  # [新增] 传递数据到前端
     )
 
 
@@ -624,3 +628,5 @@ def delete_room_record(record_id):
     db.session.commit()
     flash("访客记录已删除", "success")
     return redirect(url_for("main.records"))
+
+

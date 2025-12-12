@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+{% block title %}数据洞察中心{% endblock %}
+
+{% block content %}
+<div class="section-wrapper" style="max-width: 1000px; margin: 2rem auto;">
+  <div class="section-header-modern" style="text-align: center; margin-bottom: 3rem;">
+    <h1 style="font-size: 2rem; background: linear-gradient(135deg, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+      <i class="ri-pie-chart-2-line"></i> 数据洞察中心
+    </h1>
+    <p style="color: #64748b; font-size: 1.1rem;">全平台核心数据实时监控与多维分析</p>
+  </div>
+
+  <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+
+    <a href="{{ url_for('db_views.admin_music_view_query') }}" class="dashboard-card nav-card" style="text-decoration: none; transition: transform 0.2s;">
+      <div class="card-content flex-row">
+        <div class="text-group">
+          <h2 style="color: #1e293b;">全平台音乐库</h2>
+          <p style="color: #64748b;">查看所有上传资源及审核状态</p>
+          <div style="margin-top: 0.5rem;">
+            <span style="background: #e0e7ff; color: #4338ca; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">View: v_music_full</span>
+          </div>
+        </div>
+        <div class="icon-large" style="background: #e0e7ff; color: #4338ca;"><i class="ri-disc-line"></i></div>
+      </div>
+    </a>
+
+    <a href="{{ url_for('db_views.admin_room_view_query') }}" class="dashboard-card nav-card" style="text-decoration: none; transition: transform 0.2s;">
+      <div class="card-content flex-row">
+        <div class="text-group">
+          <h2 style="color: #1e293b;">房间活跃度</h2>
+          <p style="color: #64748b;">实时监控各房间在线人数</p>
+          <div style="margin-top: 0.5rem;">
+            <span style="background: #fce7f3; color: #be185d; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">View: v_room_stats</span>
+          </div>
+        </div>
+        <div class="icon-large" style="background: #fce7f3; color: #be185d;"><i class="ri-bar-chart-grouped-line"></i></div>
+      </div>
+    </a>
+
+    <a href="{{ url_for('db_views.admin_record_view_query') }}" class="dashboard-card nav-card" style="text-decoration: none; transition: transform 0.2s;">
+      <div class="card-content flex-row">
+        <div class="text-group">
+          <h2 style="color: #1e293b;">听歌行为流水</h2>
+          <p style="color: #64748b;">追踪全站用户的播放记录</p>
+          <div style="margin-top: 0.5rem;">
+            <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">Table: listen_record</span>
+          </div>
+        </div>
+        <div class="icon-large" style="background: #dcfce7; color: #15803d;"><i class="ri-headphone-line"></i></div>
+      </div>
+    </a>
+
+    <div class="dashboard-card nav-card" style="opacity: 0.5; cursor: default; border: 2px dashed #e2e8f0; background: #f8fafc;">
+      <div class="card-content flex-row">
+        <div class="text-group">
+          <h2 style="color: #94a3b8;">系统日志分析</h2>
+          <p style="color: #cbd5e1;">(开发中...)</p>
+        </div>
+        <div class="icon-large" style="background: #f1f5f9; color: #cbd5e1;"><i class="ri-terminal-window-line"></i></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="text-align: center; margin-top: 3rem;">
+    <a href="{{ url_for('admin.dashboard') }}" class="secondary-btn" style="padding: 0.8rem 2rem;">
+        <i class="ri-arrow-left-line"></i> 返回控制台
+    </a>
+  </div>
+</div>
+
+<style>
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+}
+</style>
+{% endblock %}

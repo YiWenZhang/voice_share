@@ -1,67 +1,186 @@
 {% extends "layout.html" %}
-{% block title %}后台审核{% endblock %}
+{% block title %}后台审核控制台{% endblock %}
 
 {% block content %}
-<section class="grid-card">
-  <h1>待审核音乐列表</h1>
-  <div class="table-scroll">
-    <table class="data-table">
-      <thead>
-        <tr><th>上传用户</th><th>文件名</th><th>上传时间</th><th>操作</th></tr>
-      </thead>
-      <tbody>
-        {% for item in pending %}
-          <tr>
-            <td>{{ item.owner.username }}</td>
-            <td>
-              <div>{{ item.title }}</div>
-              <small class="muted">{{ item.original_filename }}</small>
-            </td>
-            <td>{{ item.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
-            <td class="actions">
-              <form method="post" action="{{ url_for('admin.approve_music', music_id=item.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                <button class="primary-btn" type="submit">通过</button>
-              </form>
-              <form method="post" action="{{ url_for('admin.reject_music', music_id=item.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                <input class="input" name="reason" placeholder="可选备注" />
-                <button class="secondary-btn" type="submit">驳回</button>
-              </form>
-            </td>
-          </tr>
-        {% else %}
-          <tr><td colspan="4">暂无待审核音乐</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
+<div class="admin-wrapper" style="max-width: 1200px; margin: 0 auto;">
 
-<section class="grid-card">
-  <h1>违规音乐列表</h1>
-  <div class="table-scroll">
-    <table class="data-table">
-      <thead>
-        <tr><th>上传用户</th><th>文件名</th><th>处理时间</th><th>备注</th></tr>
-      </thead>
-      <tbody>
-        {% for item in rejected %}
+  <header class="admin-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; background: #fff; padding: 1.5rem 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+    <div class="header-left">
+      <h1 style="margin: 0; font-size: 1.5rem; color: #1e293b; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="ri-shield-check-line" style="color: #6366f1;"></i> 后台审核控制台
+      </h1>
+      <p style="margin: 0.4rem 0 0; color: #64748b; font-size: 0.95rem;">
+        当前共有 <span style="color: #f59e0b; font-weight: 700;">{{ pending|length }}</span> 首音乐等待处理
+      </p>
+    </div>
+
+    <div class="header-right">
+      <a href="{{ url_for('db_views.admin_query_center') }}" class="nav-action-btn">
+        <i class="ri-pie-chart-2-line"></i>
+        <span>数据洞察中心</span>
+      </a>
+    </div>
+  </header>
+
+  <section class="grid-card">
+    <div class="card-header-simple" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="margin: 0; font-size: 1.1rem; color: #334155; font-weight: 700;">
+        <i class="ri-loader-4-line" style="color: #f59e0b; margin-right: 5px;"></i> 待审核队列
+      </h2>
+    </div>
+
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
           <tr>
-            <td>{{ item.owner.username }}</td>
-            <td>
-              <div>{{ item.title }}</div>
-              <small class="muted">{{ item.original_filename }}</small>
-            </td>
-            <td>{{ item.updated_at.strftime('%Y-%m-%d %H:%M') if item.updated_at else '' }}</td>
-            <td>{{ item.rejection_reason or '涉嫌违规' }}</td>
+            <th style="width: 20%;">申请人</th>
+            <th style="width: 30%;">音乐信息</th>
+            <th style="width: 20%;">提交时间</th>
+            <th style="width: 30%; text-align: right;">审核操作</th>
           </tr>
-        {% else %}
-          <tr><td colspan="4">暂无违规记录</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
+        </thead>
+        <tbody>
+          {% for item in pending %}
+            <tr>
+              <td>
+                <div style="font-weight: 600; color: #1e293b;">{{ item.uploader_nickname }}</div>
+                <div style="font-size: 0.85rem; color: #94a3b8;">@{{ item.uploader_name }}</div>
+              </td>
+              <td>
+                <div style="font-weight: 600; color: #475569;">{{ item.title }}</div>
+                <div style="font-size: 0.8rem; color: #94a3b8; display: flex; align-items: center; gap: 4px;">
+                   <i class="ri-file-music-line"></i> {{ item.original_filename }}
+                </div>
+              </td>
+              <td style="color: #64748b;">{{ item.uploaded_at.strftime('%m-%d %H:%M') }}</td>
+              <td class="actions" style="justify-content: flex-end;">
+                <form method="post" action="{{ url_for('admin.approve_music', music_id=item.music_id) }}" style="margin:0;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <button class="icon-btn-text success" title="通过">
+                    <i class="ri-check-line"></i> 通过
+                  </button>
+                </form>
+
+                <form method="post" action="{{ url_for('admin.reject_music', music_id=item.music_id) }}" style="margin:0; display: flex; gap: 0.5rem;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <input class="input-tiny" name="reason" placeholder="理由..." required />
+                  <button class="icon-btn-text danger" title="驳回">
+                    <i class="ri-close-line"></i> 驳回
+                  </button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" style="text-align: center; padding: 3rem; color: #cbd5e1;">
+              <i class="ri-checkbox-circle-line" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>
+              暂无待审核任务
+            </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="grid-card" style="opacity: 0.95; margin-top: 2rem;">
+    <div class="card-header-simple" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem; margin-bottom: 1rem;">
+      <h2 style="margin: 0; font-size: 1.1rem; color: #64748b;">
+        <i class="ri-history-line" style="margin-right: 5px;"></i> 最近驳回记录
+      </h2>
+    </div>
+
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>申请人</th>
+            <th>音乐信息</th>
+            <th>操作时间</th>
+            <th>驳回原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in rejected %}
+            <tr style="background: #fffafa;">
+              <td>
+                <div>{{ item.uploader_nickname }}</div>
+                <small style="color:#94a3b8;">@{{ item.uploader_name }}</small>
+              </td>
+              <td>
+                <div style="color: #64748b;">{{ item.title }}</div>
+              </td>
+              <td style="color: #94a3b8;">{{ item.uploaded_at.strftime('%m-%d %H:%M') }}</td>
+              <td>
+                <span style="color: #ef4444; background: #fee2e2; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">
+                  {{ item.rejection_reason }}
+                </span>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" style="text-align: center; padding: 2rem; color: #94a3b8;">暂无驳回记录</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<style>
+  /* 导航按钮样式 */
+  .nav-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    background: #f8fafc;
+    color: #6366f1;
+    border: 1px solid #e0e7ff;
+    border-radius: 99px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+  }
+  .nav-action-btn:hover {
+    background: #6366f1;
+    color: #fff;
+    border-color: #6366f1;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    transform: translateY(-2px);
+  }
+
+  /* 表格操作按钮 */
+  .icon-btn-text {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+  }
+  .icon-btn-text.success { color: #10b981; background: #ecfdf5; }
+  .icon-btn-text.success:hover { background: #10b981; color: #fff; }
+
+  .icon-btn-text.danger { color: #ef4444; background: #fef2f2; }
+  .icon-btn-text.danger:hover { background: #ef4444; color: #fff; }
+
+  /* 迷你输入框 */
+  .input-tiny {
+    border: 1px solid #e2e8f0;
+    padding: 0.3rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    width: 140px;
+    transition: border-color 0.2s;
+  }
+  .input-tiny:focus {
+    outline: none;
+    border-color: #ef4444;
+  }
+</style>
 {% endblock %}
-

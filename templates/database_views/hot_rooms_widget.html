@@ -1,0 +1,154 @@
+<section class="dashboard-card" style="grid-column: 1 / -1; background: linear-gradient(135deg, #fff, #f5f3ff); position: relative;">
+
+  <div class="card-icon-bg"><i class="ri-fire-line"></i></div>
+  <div class="card-content">
+    <h2 style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+      🔥 热门房间推荐
+      <span style="font-size: 0.8rem; font-weight: normal; color: #64748b; background: rgba(255,255,255,0.8); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.05);">
+        基于视图聚合统计
+      </span>
+    </h2>
+
+    <div style="display: flex; gap: 1rem; overflow-x: auto; padding: 0.5rem 0.2rem 1.5rem 0.2rem; scroll-behavior: smooth;">
+      {% for room in hot_rooms %}
+        <div onclick="openFeastModal('{{ url_for('main.room_detail', code=room.code) }}', '{{ room.name }}', '{{ room.owner_name }}')"
+             class="room-widget-card"
+             style="cursor: pointer; flex: 0 0 auto; width: 200px; background: #fff; border-radius: 16px;
+                    border: 1px solid #eef2ff; box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+                    transition: all 0.3s ease; position: relative; overflow: hidden;">
+
+          <div style="height: 6px; background: linear-gradient(90deg, #a78bfa, #818cf8); width: 100%;"></div>
+
+          <div style="padding: 1.2rem 1rem;">
+            <div style="font-weight: 700; color: #1e293b; font-size: 1.1rem; margin-bottom: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              {{ room.name }}
+            </div>
+
+            <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.3rem;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <img src="https://placehold.co/40x40/8b5cf6/ffffff?text={{ room.owner_name[0] }}" style="width: 20px; height: 20px; border-radius: 50%;" alt="">
+                <span>{{ room.owner_name }}</span>
+              </div>
+              <div style="background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 0.8rem; align-self: flex-start;">
+                房间号 #{{ room.code }}
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed #e2e8f0; padding-top: 0.8rem;">
+              <span style="font-size: 0.75rem; color: #94a3b8;">当前热度</span>
+              <span style="font-size: 0.95rem; color: #f59e0b; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                <i class="ri-fire-fill"></i> {{ room.member_count }}
+              </span>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div style="padding: 2rem; color: #94a3b8; width: 100%; text-align: center; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
+            <i class="ri-zzz-line" style="font-size: 1.5rem; display: block; margin-bottom: 0.5rem;"></i>
+            暂无活跃房间，快去创建一个吧！
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<div id="feast-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999;
+     backdrop-filter: blur(8px); background: rgba(15, 23, 42, 0.6); align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
+
+  <div class="feast-card" style="background: rgba(255, 255, 255, 0.98); width: 90%; max-width: 380px; border-radius: 24px;
+       padding: 2.5rem 2rem; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);">
+
+    <div style="width: 72px; height: 72px; background: linear-gradient(135deg, #8b5cf6, #ec4899); border-radius: 50%;
+         display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(139, 92, 246, 0.4);">
+      <i class="ri-music-2-fill" style="font-size: 36px; color: #fff;"></i>
+    </div>
+
+    <h3 style="margin: 0 0 0.5rem; font-size: 1.4rem; color: #1e293b; font-weight: 800;">发现音乐盛宴！</h3>
+
+    <p style="color: #64748b; font-size: 1rem; margin: 0 0 2rem; line-height: 1.6;">
+      房主 <span id="modal-owner-name" style="color: #8b5cf6; font-weight: 600;"></span> 正在<br>
+      <span id="modal-room-name" style="color: #1e293b; font-weight: 700; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;"></span> 房间等候
+    </p>
+
+    <div style="display: flex; gap: 1rem; flex-direction: column;">
+      <button id="confirm-join-btn" style="width: 100%; padding: 1rem; border-radius: 14px; border: none;
+              background: linear-gradient(90deg, #8b5cf6, #ec4899); color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer;
+              box-shadow: 0 8px 20px rgba(139, 92, 246, 0.25); transition: transform 0.1s;">
+        🚀 立即加入这场盛宴
+      </button>
+
+      <button onclick="closeFeastModal()" style="width: 100%; padding: 0.8rem; border-radius: 14px; border: none;
+              background: transparent; color: #94a3b8; font-weight: 600; cursor: pointer; transition: color 0.2s;">
+        再看看别的
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 保存目标跳转链接
+  let targetRoomUrl = '';
+
+  function openFeastModal(url, roomName, ownerName) {
+    targetRoomUrl = url;
+    const modal = document.getElementById('feast-modal');
+    const card = modal.querySelector('.feast-card');
+
+    // 填充数据
+    document.getElementById('modal-room-name').textContent = roomName;
+    document.getElementById('modal-owner-name').textContent = ownerName;
+
+    // 显示并执行动画
+    modal.style.display = 'flex';
+    // 强制重绘以触发 transition
+    requestAnimationFrame(() => {
+      modal.style.opacity = '1';
+      card.style.transform = 'scale(1)';
+    });
+
+    // 绑定确认按钮点击事件
+    document.getElementById('confirm-join-btn').onclick = function() {
+      const btn = this;
+      btn.innerHTML = '<i class="ri-loader-4-line ri-spin"></i> 正在连接频段...';
+      btn.style.opacity = '0.8';
+
+      // 模拟一点点连接延迟，增加仪式感
+      setTimeout(() => {
+        window.location.href = targetRoomUrl;
+      }, 400);
+    };
+  }
+
+  function closeFeastModal() {
+    const modal = document.getElementById('feast-modal');
+    const card = modal.querySelector('.feast-card');
+
+    // 退场动画
+    modal.style.opacity = '0';
+    card.style.transform = 'scale(0.9)';
+
+    setTimeout(() => {
+      modal.style.display = 'none';
+      // 重置按钮状态
+      document.getElementById('confirm-join-btn').innerHTML = '🚀 立即加入这场盛宴';
+      document.getElementById('confirm-join-btn').style.opacity = '1';
+    }, 300);
+  }
+
+  // 点击遮罩层也可以关闭
+  document.getElementById('feast-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeFeastModal();
+  });
+</script>
+
+<style>
+  /* 补充的 CSS，仅作用于此组件 */
+  .room-widget-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 25px rgba(108, 92, 231, 0.15) !important;
+    border-color: #c4b5fd !important;
+  }
+  #confirm-join-btn:active {
+    transform: scale(0.98);
+  }
+</style>

@@ -1,0 +1,133 @@
+"D:\Desktop\voice share\venv\Scripts\python.exe" "D:\Desktop\voice share\app\test_insert_update_delete_sql.py"
+数据库表已通过原生 MySQL SQL 创建完成。
+========================================
+当前数据库: mysql+pymysql://root:123456@localhost:3306/voice_share
+========================================
+
+请选择要测试的原生 SQL 功能:
+1. 修改个人资料 (UPDATE)
+2. 上传音乐 (INSERT)
+3. 删除音乐 (DELETE)
+4. 创建房间 (INSERT)
+5. 添加到播放列表 (INSERT)
+6. 房间开关状态 (UPDATE)
+q. 退出
+
+请输入选项 (1-6): 1
+
+[测试 1] 修改个人资料 (UPDATE)
+   执行 SQL: UPDATE user SET nickname='User_173425'...
+   数据库当前值: User_173425
+   测试通过
+
+请选择要测试的原生 SQL 功能:
+1. 修改个人资料 (UPDATE)
+2. 上传音乐 (INSERT)
+3. 删除音乐 (DELETE)
+4. 创建房间 (INSERT)
+5. 添加到播放列表 (INSERT)
+6. 房间开关状态 (UPDATE)
+q. 退出
+
+请输入选项 (1-6): 2
+
+[测试 2] 上传音乐 (INSERT)
+   执行 SQL: INSERT INTO musics ... title='TestSong_173428'
+   查询结果: ID=5, Title=TestSong_173428, Status=pending
+   测试通过
+
+请选择要测试的原生 SQL 功能:
+1. 修改个人资料 (UPDATE)
+2. 上传音乐 (INSERT)
+3. 删除音乐 (DELETE)
+4. 创建房间 (INSERT)
+5. 添加到播放列表 (INSERT)
+6. 房间开关状态 (UPDATE)
+q. 退出
+
+请输入选项 (1-6): 3
+
+[测试 3] 删除音乐 (DELETE)
+   ...准备数据中...
+
+[测试 2] 上传音乐 (INSERT)
+   执行 SQL: INSERT INTO musics ... title='TestSong_173429'
+   查询结果: ID=6, Title=TestSong_173429, Status=pending
+   测试通过
+   执行 SQL: DELETE FROM musics WHERE id=6...
+   影响行数: 1
+   测试通过 (记录已消失)
+
+请选择要测试的原生 SQL 功能:
+1. 修改个人资料 (UPDATE)
+2. 上传音乐 (INSERT)
+3. 删除音乐 (DELETE)
+4. 创建房间 (INSERT)
+5. 添加到播放列表 (INSERT)
+6. 房间开关状态 (UPDATE)
+q. 退出
+
+请输入选项 (1-6): 4
+
+[测试 4] 创建房间 (INSERT 多表)
+   执行 SQL: 插入 room 和 participation 记录, Code=173431
+   测试通过 (RoomID=6, RecID=6)
+
+请选择要测试的原生 SQL 功能:
+1. 修改个人资料 (UPDATE)
+2. 上传音乐 (INSERT)
+3. 删除音乐 (DELETE)
+4. 创建房间 (INSERT)
+5. 添加到播放列表 (INSERT)
+6. 房间开关状态 (UPDATE)
+q. 退出
+
+请输入选项 (1-6): 5
+
+[测试 5] 添加到播放列表 (INSERT)
+   ...准备房间和音乐...
+
+[测试 4] 创建房间 (INSERT 多表)
+   执行 SQL: 插入 room 和 participation 记录, Code=173433
+   测试通过 (RoomID=7, RecID=7)
+
+[测试 2] 上传音乐 (INSERT)
+   执行 SQL: INSERT INTO musics ... title='TestSong_173433'
+   查询结果: ID=7, Title=TestSong_173433, Status=pending
+   测试通过
+   执行 SQL: INSERT INTO room_playlist ...
+   测试通过
+
+请选择要测试的原生 SQL 功能:
+1. 修改个人资料 (UPDATE)
+2. 上传音乐 (INSERT)
+3. 删除音乐 (DELETE)
+4. 创建房间 (INSERT)
+5. 添加到播放列表 (INSERT)
+6. 房间开关状态 (UPDATE)
+q. 退出
+
+请输入选项 (1-6): 6
+
+[测试 6] 房间开关状态 (UPDATE)
+   ...准备房间...
+
+[测试 4] 创建房间 (INSERT 多表)
+   执行 SQL: 插入 room 和 participation 记录, Code=173434
+   测试通过 (RoomID=8, RecID=8)
+   执行 SQL: UPDATE room SET is_active=0 ...
+   测试通过 (房间已关闭)
+
+请选择要测试的原生 SQL 功能:
+1. 修改个人资料 (UPDATE)
+2. 上传音乐 (INSERT)
+3. 删除音乐 (DELETE)
+4. 创建房间 (INSERT)
+5. 添加到播放列表 (INSERT)
+6. 房间开关状态 (UPDATE)
+q. 退出
+
+请输入选项 (1-6): q
+退出测试。
+
+进程已结束，退出代码为 0

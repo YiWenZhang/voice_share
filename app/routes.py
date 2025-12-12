@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-
+from sqlalchemy import text
 from flask import (
     Blueprint,
     abort,
@@ -67,19 +67,33 @@ def profile():
         abort(403)
     form = ProfileForm(obj=current_user)
     if form.validate_on_submit():
-        current_user.nickname = form.nickname.data
+        # --- 原生 SQL UPDATE ---
+        avatar_path = current_user.avatar_path
         avatar_file = request.files.get("avatar")
         if avatar_file and avatar_file.filename:
             stored_name = save_avatar(avatar_file)
             if not stored_name:
                 flash("仅支持常见图片格式，大小请控制在 5MB 内", "error")
                 return render_template("profile.html", form=form)
-            current_user.avatar_path = stored_name
+            avatar_path = stored_name  # 更新路径变量
+
+        sql = text("""
+            UPDATE user 
+            SET nickname = :nickname, avatar_path = :avatar, updated_at = :now
+            WHERE id = :uid
+        """)
+        db.session.execute(sql, {
+            "nickname": form.nickname.data,
+            "avatar": avatar_path,
+            "now": datetime.utcnow(),
+            "uid": current_user.id
+        })
+        # --- [结束修改] ---
+
         db.session.commit()
         flash("个人信息已更新", "success")
         return redirect(url_for("main.profile"))
     return render_template("profile.html", form=form)
-
 
 @main_bp.route("/music", methods=["GET", "POST"])
 @login_required
@@ -99,13 +113,23 @@ def music():
                 title = (upload_form.title.data or "").strip()
                 if not title:
                     title = Path(file.filename).stem or "未命名歌曲"
-                music = Music(
-                    user_id=current_user.id,
-                    title=title,
-                    original_filename=file.filename,
-                    stored_filename=stored_name,
-                )
-                db.session.add(music)
+
+                # --- [开始修改] 改为原生 SQL INSERT ---
+                # 注意表名是 musics
+                sql = text("""
+                                    INSERT INTO musics (user_id, title, original_filename, stored_filename, status, uploaded_at, created_at)
+                                    VALUES (:uid, :title, :orig_name, :stored_name, 'pending', :now, :now)
+                                """)
+
+                db.session.execute(sql, {
+                    "uid": current_user.id,
+                    "title": title,
+                    "orig_name": file.filename,
+                    "stored_name": stored_name,
+                    "now": datetime.utcnow()
+                })
+                # --- [结束修改] ---
+
                 db.session.commit()
                 flash("请确保上传音乐拥有合法使用权限", "info")
                 flash("音乐已进入待审核队列", "success")
@@ -119,10 +143,20 @@ def music():
 def delete_music(music_id):
     if current_user.is_admin:
         abort(403)
-    music = Music.query.filter_by(id=music_id, user_id=current_user.id).first_or_404()
-    # 同时删除在任何房间播放列表中的引用
-    RoomPlaylist.query.filter_by(music_id=music.id).delete()
-    db.session.delete(music)
+
+    # --- [开始修改] 改为原生 SQL DELETE ---
+    # 为了数据一致性，先删除关联的播放列表记录（如果数据库未设置级联删除）
+    sql_del_playlist = text("DELETE FROM room_playlist WHERE music_id = :mid")
+    db.session.execute(sql_del_playlist, {"mid": music_id})
+
+    # 再删除音乐本身，且必须确保是当前用户的音乐
+    sql_del_music = text("DELETE FROM musics WHERE id = :mid AND user_id = :uid")
+    result = db.session.execute(sql_del_music, {"mid": music_id, "uid": current_user.id})
+
+    if result.rowcount == 0:
+        abort(404)  # 如果没删掉任何行，说明音乐不存在或不属于该用户
+    # --- [结束修改] ---
+
     db.session.commit()
     flash("音乐已删除", "info")
     return redirect(url_for("main.music"))
@@ -174,12 +208,37 @@ def create_room():
         return redirect(url_for("main.dashboard"))
     # ========================== [结束插入修改代码] ==========================
 
+
+
+    # --- [开始修改] 改为原生 SQL INSERT ---
     code = _generate_unique_room_code()
-    room = Room(owner_id=current_user.id, name=form.name.data or generate_room_name(), code=code)
-    db.session.add(room)
-    db.session.commit()
-    participation = RoomParticipationRecord(user_id=current_user.id, room_code=code)
-    db.session.add(participation)
+    room_name = form.name.data or generate_room_name()
+    now = datetime.utcnow()
+
+    # 1. 插入房间表
+    sql_room = text("""
+        INSERT INTO room (owner_id, name, code, is_active, playback_status, current_position, created_at)
+        VALUES (:uid, :name, :code, 1, 'paused', 0.0, :now)
+    """)
+    db.session.execute(sql_room, {
+        "uid": current_user.id,
+        "name": room_name,
+        "code": code,
+        "now": now
+    })
+
+    # 2. 插入参与记录表
+    sql_record = text("""
+        INSERT INTO room_participation_record (user_id, room_code, participated_at)
+        VALUES (:uid, :code, :now)
+    """)
+    db.session.execute(sql_record, {
+        "uid": current_user.id,
+        "code": code,
+        "now": now
+    })
+    # --- [结束修改] ---
+
     db.session.commit()
     flash(f"房间创建成功，房间号 {code}", "success")
     return redirect(url_for("main.room_detail", code=code))
@@ -282,11 +341,31 @@ def add_to_playlist(code):
     # 检查是否已在列表中（可选，这里允许重复添加）
     # existing = RoomPlaylist.query.filter_by(room_id=room.id, music_id=music.id).first()
 
-    item = RoomPlaylist(room_id=room.id, music_id=music.id)
-    db.session.add(item)
-    db.session.commit()
+    # --- [开始修改] 改为原生 SQL INSERT ---
+    # 先验证音乐是否存在且属于当前用户且已过审（用 Select 验证）
+    check_sql = text("SELECT id, title FROM musics WHERE id=:mid AND user_id=:uid AND status='approved'")
+    res = db.session.execute(check_sql, {"mid": music_id, "uid": current_user.id}).fetchone()
 
-    flash(f"已将《{music.title}》添加到房间播放列表", "success")
+    if not res:
+        flash("音乐不存在或未审核通过", "error")
+        return redirect(url_for("main.room_detail", code=code))
+
+    music_title = res[1]  # 获取歌名用于提示
+
+    # 插入播放列表
+    insert_sql = text("""
+        INSERT INTO room_playlist (room_id, music_id, created_at)
+        VALUES (:rid, :mid, :now)
+    """)
+    db.session.execute(insert_sql, {
+        "rid": room.id,  # 这里 room.id 还是可以从上面查询出来的 room 对象获取，或者也改成 SQL 查询
+        "mid": music_id,
+        "now": datetime.utcnow()
+    })
+    # --- [结束修改] ---
+
+    db.session.commit()
+    flash(f"已将《{music_title}》添加到房间播放列表", "success")
     return redirect(url_for("main.room_detail", code=code))
 
 
@@ -317,24 +396,45 @@ def leave_room(code):
 @main_bp.route("/rooms/<code>/availability", methods=["POST"])
 @login_required
 def room_availability(code):
-    room = Room.query.filter_by(code=code).first_or_404()
-    if room.owner_id != current_user.id:
+    # --- [开始修改] 改为原生 SQL UPDATE ---
+    # 1. 确认房间存在且属于当前用户
+    room_query = text("SELECT id, is_active FROM room WHERE code=:code AND owner_id=:uid")
+    result = db.session.execute(room_query, {"code": code, "uid": current_user.id}).fetchone()
+
+    if not result:
         abort(403)
+
+    room_id = result[0]
+
     action = request.form.get("action")
+    message = ""
+
     if action == "close":
-        room.is_active = False
-        room.playback_status = "paused"
+        # 关闭房间：设置 is_active=0, playback_status='paused'
+        update_sql = text("""
+            UPDATE room 
+            SET is_active = 0, playback_status = 'paused', updated_at = :now 
+            WHERE id = :rid
+        """)
         message = "房间已关闭，成员将无法继续进入"
     elif action == "open":
-        room.is_active = True
+        # 开启房间：设置 is_active=1
+        update_sql = text("""
+            UPDATE room 
+            SET is_active = 1, updated_at = :now 
+            WHERE id = :rid
+        """)
         message = "房间已重新开放，房间号可继续使用"
     else:
         flash("未知操作", "error")
         return redirect(url_for("main.room_detail", code=code))
+
+    db.session.execute(update_sql, {"now": datetime.utcnow(), "rid": room_id})
+    # --- [结束修改] ---
+
     db.session.commit()
     flash(message, "success")
     return redirect(url_for("main.room_detail", code=code))
-
 
 @main_bp.route("/rooms/<code>/delete", methods=["POST"])
 @login_required

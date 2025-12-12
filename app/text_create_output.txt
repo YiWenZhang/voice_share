@@ -1,0 +1,12 @@
+"D:\Desktop\voice share\venv\Scripts\python.exe" "D:\Desktop\voice share\app\test_create.py"
+数据库表已通过原生 MySQL SQL 创建完成。
+========================================
+开始后端原生 SQL 测试 (MySQL 版)
+========================================
+当前连接目标: mysql+pymysql://root:123456@localhost:3306/voice_share
+
+>>> 验证数据库定义 (DDL)...
+当前数据库中存在的表: ['listen_record', 'musics', 'room', 'room_member', 'room_message', 'room_participation_record', 'room_playlist', 'user']
+成功：核心表 (user, musics, room) 已检测到。
+
+进程已结束，退出代码为 0

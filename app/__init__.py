@@ -35,6 +35,7 @@ def create_app():
     app.register_blueprint(admin_bp)
 
     with app.app_context():
+        # 创建数据库
         init_db_with_raw_sql(db)
 
     return app

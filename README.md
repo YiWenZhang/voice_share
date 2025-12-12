@@ -1,7 +1,7 @@
 ## 共享听歌房系统
 
-基于 Flask + SQLite 的一体化网页系统，覆盖注册登录、音乐上传、房间共享听歌、房间互动、行为记录、管理员审核等完整流程。普通用户 5 分钟内即可完成 “注册登录 → 创建房间 → 上传音乐 → 播放音乐 → 发送评论” 核心闭环，管理员拥有独立审核后台。
-目前已经部署服务器，欢迎大家来玩！
+基于 Flask + MySQL 的一体化网页系统，覆盖注册登录、音乐上传、房间共享听歌、房间互动、行为记录、管理员审核等完整流程。普通用户 5 分钟内即可完成 “注册登录 → 创建房间 → 上传音乐 → 播放音乐 → 发送评论” 核心闭环，管理员拥有独立审核后台。
+目前旧版本（SQLite）已经部署服务器，欢迎大家查看整体功能！
 网址：http://115.190.207.9
 
 ### 功能概览
@@ -16,17 +16,23 @@
 
 ### 运行方式
 
-1. **安装依赖**
+1. **环境准备**
+   - 确保本地已安装 MySQL 8.0+。
+   - 登录 MySQL 并创建数据库：
+     ```sql
+     CREATE DATABASE voice_share CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+     ```
+
+2. **安装依赖**
    ```bash
    pip install -r requirements.txt
    ```
-2. **设置环境变量（可选）**
+3. **设置环境变量（可选）**
    - 复制 `.env.example` 为 `.env`，根据需要调整 `SECRET_KEY`、`DATABASE_URL`。
-3. **初始化数据库**
-   - 首次运行会自动执行 `db.create_all()`，无需额外迁移操作。
+
 4. **启动应用**
    ```bash
-   flask --app run.py run
+   flask --app run.py run[MySQLWorkbench.exe - 快捷方式.lnk](..%2F..%2FmysqlWorkbench%2FMySQLWorkbench.exe%20-%20%BF%EC%BD%DD%B7%BD%CA%BD.lnk)
    ```
    或直接执行：
    ```bash
@@ -37,7 +43,7 @@
    - 管理员后台：http://localhost:5000/admin （需要先注册管理员账号）
 
 ### 目录结构
-
+ps:这里还没更新（）
 ```
 voice share/
 ├── app/                # Flask 应用主体

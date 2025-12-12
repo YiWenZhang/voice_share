@@ -9,11 +9,12 @@
   * { box-sizing: border-box; }
 
   body {
-    /* 保持外围悬浮间隙 */
+    /* [核心修改] 给整个页面加一圈间隙，不再贴边！ */
     padding: 20px !important;
-    overflow: hidden;
+    overflow: hidden; /* 禁止 Body 滚动 */
     height: 100vh;
     width: 100vw;
+    /* 背景色兜底 */
     background-color: #f1f5f9;
   }
 
@@ -25,28 +26,31 @@
     display: flex;
     height: 100%;
     width: 100%;
+
+    /* [核心修改] 悬浮卡片效果 */
     background: transparent;
-    border-radius: 28px;
-    overflow: hidden;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 30px 60px -15px rgba(0, 0, 0, 0.3);
+    border-radius: 24px; /* 大圆角，让四个角都不贴边 */
+    overflow: hidden; /* 切割子元素，保证圆角生效 */
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* 强阴影提升悬浮感 */
     border: 1px solid rgba(255, 255, 255, 0.2);
   }
 
-  /* --- 2. 左侧侧边栏 (保持你满意的样式，不动) --- */
+  /* --- 2. 左侧侧边栏 (深色磨砂) --- */
   .admin-sidebar {
-    width: 300px; /* 保持 300px 宽度 */
-    background: rgba(15, 23, 42, 0.96);
-    backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+    width: 260px;
+    /* 加深背景，与外部亮色区分 */
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border-right: 1px solid rgba(255,255,255,0.05);
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: 100%; /* 跟随父容器高度 */
     z-index: 100;
     flex-shrink: 0;
   }
 
   .sidebar-header {
-    padding: 3rem 2rem 2rem 3rem;
+    padding: 2.5rem 2rem 1.5rem; /* 增加内部间隙 */
     flex-shrink: 0;
     border-bottom: 1px solid rgba(255,255,255,0.05);
   }
@@ -54,47 +58,33 @@
   .sidebar-scroll-area {
     flex: 1;
     overflow-y: auto;
-    padding: 2rem 1.5rem 2rem 3rem;
+    padding: 1.5rem; /* 增加侧边栏内部左右间隙 */
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 0.5rem;
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.1) transparent;
   }
 
   .sidebar-footer {
-    padding: 2rem 2rem 2.5rem 3rem;
+    padding: 2rem;
     border-top: 1px solid rgba(255,255,255,0.05);
     flex-shrink: 0;
     background: rgba(10, 15, 30, 0.3);
   }
 
-  /* --- 3. 右侧内容区 (核心修改：居中 + 上下留白) --- */
+  /* --- 3. 右侧内容区 (通透宽敞) --- */
   .admin-content {
     flex: 1;
+    /* 内容区内边距：上下宽敞，左右适中 */
+    padding: 4rem 5rem;
     overflow-y: auto;
-    height: 100%;
+    height: 100%; /* 跟随父容器高度 */
     position: relative;
     z-index: 10;
-    background: rgba(255, 255, 255, 0.4);
-    backdrop-filter: blur(12px);
-
-    /* [关键布局] Flex 居中，确保内容永远在中间 */
-    display: flex;
-    flex-direction: column;
-    align-items: center; /* 水平居中 */
-
-    /* [关键留白] 顶部留出 6rem，底部留出 4rem */
-    padding-top: 6rem;
-    padding-bottom: 4rem;
-  }
-
-  /* [新增] 内容包装器：限制最大宽度，控制内容区的实际宽度 */
-  .content-wrapper {
-    width: 90%; /* 默认占 90% 宽度，左右各留 5% */
-    max-width: 1400px; /* 最大不超过 1400px，大屏上留白更多 */
-
-    /* 这里不需要 padding，因为宽度限制已经天然形成了左右留白 */
+    /* 极淡的白色磨砂，透出极光背景 */
+    background: rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(10px);
   }
 
   /* --- 4. 组件样式 --- */
@@ -103,76 +93,77 @@
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
-    margin-bottom: 3.5rem;
+    margin-bottom: 2.5rem;
     padding: 0 !important;
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
   }
   .module-title h1 {
-    font-size: 2.4rem;
+    font-size: 2.2rem;
     font-weight: 800;
     color: #1e293b;
     margin: 0;
-    display: flex; align-items: center; gap: 1.2rem;
-    text-shadow: 0 4px 15px rgba(255,255,255,0.8);
+    display: flex; align-items: center; gap: 1rem;
+    text-shadow: 0 2px 10px rgba(255,255,255,0.8);
   }
   .module-title p {
-    color: #475569; margin-top: 0.8rem; font-size: 1.1rem; font-weight: 500; opacity: 0.8;
+    color: #475569; margin-top: 0.5rem; font-size: 1.05rem; font-weight: 500;
   }
 
-  /* 玻璃卡片 */
   .glass-panel, .grid-card, .dashboard-card {
-    background: rgba(255, 255, 255, 0.65) !important;
+    background: rgba(255, 255, 255, 0.6) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
     border: 1px solid rgba(255, 255, 255, 0.6) !important;
-    border-radius: 24px !important;
-    box-shadow: 0 8px 40px -10px rgba(31, 38, 135, 0.05) !important;
-
-    /* [关键] 卡片内部增加 padding，防止内容贴边 */
-    padding: 3rem !important;
-
-    margin-bottom: 3rem;
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 20px !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05) !important;
+    padding: 2.5rem !important;
+    margin-bottom: 2.5rem;
+    transition: transform 0.2s ease;
   }
 
   .glass-panel:hover, .grid-card:hover, .dashboard-card:hover {
-    transform: translateY(-5px);
-    background: rgba(255, 255, 255, 0.8) !important;
-    box-shadow: 0 20px 50px -12px rgba(0,0,0,0.1) !important;
+    transform: translateY(-3px);
+    background: rgba(255, 255, 255, 0.75) !important;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.08) !important;
   }
 
   /* 侧边栏链接 */
   .sidebar-link {
-    display: flex; align-items: center; gap: 1.2rem; padding: 1.1rem 1.2rem;
-    color: #94a3b8; text-decoration: none; font-weight: 600; font-size: 1rem;
-    border-radius: 14px; transition: all 0.2s;
+    display: flex; align-items: center; gap: 1rem; padding: 0.9rem 1.2rem;
+    color: #94a3b8; text-decoration: none; font-weight: 600; font-size: 0.95rem;
+    border-radius: 12px; transition: all 0.2s;
   }
-  .sidebar-link:hover { background: rgba(255,255,255,0.1); color: #fff; transform: translateX(6px); }
+  .sidebar-link:hover { background: rgba(255,255,255,0.1); color: #fff; transform: translateX(5px); }
   .sidebar-link.active {
     background: linear-gradient(90deg, #6366f1, #8b5cf6);
-    color: #fff; box-shadow: 0 8px 25px -5px rgba(99, 102, 241, 0.5);
+    color: #fff; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
   }
 
   /* 表格 */
-  .table-scroll { overflow-x: auto; padding-bottom: 5px; }
-  .data-table { border-collapse: separate; border-spacing: 0 0.8rem; width: 100%; }
-  .data-table th { text-align: left; padding: 0 1.5rem 0.8rem; color: #64748b; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 1px; font-weight: 700; }
+  .table-scroll { overflow-x: auto; }
+  .data-table { border-collapse: separate; border-spacing: 0 0.6rem; width: 100%; }
+  .data-table th { text-align: left; padding: 0 1.5rem 0.5rem; color: #64748b; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; }
   .data-table tbody tr { background: rgba(255,255,255,0.45); transition: all 0.2s; }
-  .data-table tbody tr:hover { background: rgba(255,255,255,0.85); transform: scale(1.01); box-shadow: 0 8px 20px -5px rgba(0,0,0,0.05); }
-  .data-table td { padding: 1.5rem 1.5rem; border: none; vertical-align: middle; }
-  .data-table td:first-child { border-top-left-radius: 16px; border-bottom-left-radius: 16px; }
-  .data-table td:last-child { border-top-right-radius: 16px; border-bottom-right-radius: 16px; }
+  .data-table tbody tr:hover { background: rgba(255,255,255,0.8); transform: scale(1.005); box-shadow: 0 4px 10px rgba(0,0,0,0.03); }
+  .data-table td { padding: 1.2rem 1.5rem; border: none; vertical-align: middle; }
+  .data-table td:first-child { border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+  .data-table td:last-child { border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
 
-  .modern-action-btn { border: none; border-radius: 12px; cursor: pointer; font-weight: 600; transition: transform 0.1s; }
+  .modern-action-btn { border: none; border-radius: 10px; cursor: pointer; font-weight: 600; transition: transform 0.1s; }
   .modern-action-btn:active { transform: scale(0.96); }
-  .icon-btn-text { border: none; cursor: pointer; font-weight: 600; padding: 0.6rem 1.2rem; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 0.95rem; }
-  .input-tiny { padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; font-size: 0.95rem; }
+  .icon-btn-text { border: none; cursor: pointer; font-weight: 600; padding: 0.5rem 1rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; }
+  .input-tiny { padding: 0.5rem; border-radius: 6px; border: 1px solid #cbd5e1; outline: none; }
 
-  .admin-id-badge { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 1.2rem; display: flex; align-items: center; gap: 1.2rem; margin-bottom: 1.5rem; border: 1px solid rgba(255,255,255,0.05); }
-  .admin-icon-box { width: 48px; height: 48px; background: linear-gradient(135deg, #475569, #334155); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.4rem; }
+  .admin-id-badge { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 1rem; display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,0.05); }
+  .admin-icon-box { width: 40px; height: 40px; background: linear-gradient(135deg, #475569, #334155); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.2rem; }
 
+  /* 响应式：屏幕变小时减少边距 */
+  @media (max-width: 1200px) {
+    .admin-content { padding: 3rem; }
+    body { padding: 10px !important; }
+  }
 </style>
 {% endblock %}
 
@@ -181,14 +172,14 @@
 
   <aside class="admin-sidebar">
     <div class="sidebar-header">
-      <div class="sidebar-title" style="font-size: 1.8rem; color: #fff; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: center; gap: 0.8rem;">
+      <div class="sidebar-title" style="font-size: 1.6rem; color: #fff; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: center; gap: 0.8rem;">
         <i class="ri-sound-module-fill" style="color: #a78bfa;"></i> VS.Admin
       </div>
-      <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; letter-spacing: 2px; font-family: monospace;">SYSTEM CONSOLE</div>
+      <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.4rem; letter-spacing: 1px; font-family: monospace;">SYSTEM CONSOLE</div>
     </div>
 
     <div class="sidebar-scroll-area">
-      <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 0.8rem; padding-left: 0.5rem; letter-spacing: 1px;">Main</div>
+      <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 0.5rem; padding-left: 0.5rem;">Main</div>
 
       <a href="{{ url_for('admin.dashboard') }}" class="sidebar-link {{ 'active' if active_page == 'review' }}">
         <i class="ri-shield-star-line"></i> <span>审核工作台</span>
@@ -197,7 +188,7 @@
         <i class="ri-pie-chart-2-line"></i> <span>数据洞察中心</span>
       </a>
 
-      <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; margin: 2rem 0 0.8rem 0.5rem; letter-spacing: 1px;">DBA Toolkit</div>
+      <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; margin: 1.5rem 0 0.5rem 0.5rem;">DBA Toolkit</div>
 
       <a href="{{ url_for('admin.db_health') }}" class="sidebar-link {{ 'active' if active_page == 'health' }}">
         <i class="ri-heart-pulse-line"></i> <span>索引与健康</span>
@@ -218,12 +209,12 @@
         <div class="admin-icon-box"><i class="ri-shield-user-fill"></i></div>
         <div>
           <div style="color: #fff; font-weight: 700; font-family: monospace; font-size: 1.1rem;">#{{ current_user.id }}</div>
-          <div style="color: #94a3b8; font-size: 0.8rem; margin-top: 2px;">Administrator</div>
+          <div style="color: #94a3b8; font-size: 0.75rem;">Administrator</div>
         </div>
       </div>
       <form method="post" action="{{ url_for('auth.logout') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <button type="submit" class="logout-btn-sidebar" style="width: 100%; background: transparent; border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 1rem; border-radius: 12px; cursor: pointer; font-weight: 600; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.6rem; font-size: 0.95rem;">
+        <button type="submit" class="logout-btn-sidebar" style="width: 100%; background: transparent; border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 0.8rem; border-radius: 10px; cursor: pointer; font-weight: 600; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
           <i class="ri-logout-box-r-line"></i> 安全退出
         </button>
       </form>
@@ -231,115 +222,113 @@
   </aside>
 
   <main class="admin-content">
-    <div class="content-wrapper">
-      {% block admin_main %}
-        <div class="module-header">
-          <div class="module-title">
-            <h1><i class="ri-shield-check-fill" style="color: #6366f1;"></i> 审核工作台</h1>
-            <p>处理用户上传的音乐资源申请，维护社区内容合规。</p>
-          </div>
-          <div class="header-status">
-             <span style="background: rgba(99, 102, 241, 0.1); color: #4338ca; padding: 0.8rem 1.5rem; border-radius: 16px; font-weight: 700; font-size: 1rem; border: 1px solid rgba(99, 102, 241, 0.2);">
-               待办任务: {{ pending|length }}
-             </span>
-          </div>
+    {% block admin_main %}
+      <div class="module-header">
+        <div class="module-title">
+          <h1><i class="ri-shield-check-fill" style="color: #6366f1;"></i> 审核工作台</h1>
+          <p>处理用户上传的音乐资源申请，维护社区内容合规。</p>
+        </div>
+        <div class="header-status">
+           <span style="background: rgba(99, 102, 241, 0.1); color: #4338ca; padding: 0.8rem 1.5rem; border-radius: 16px; font-weight: 700; font-size: 1rem; border: 1px solid rgba(99, 102, 241, 0.2);">
+             待办任务: {{ pending|length }}
+           </span>
+        </div>
+      </div>
+
+      <section class="grid-card">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+          <h2 style="margin: 0; font-size: 1.25rem; color: #334155; font-weight: 700;">
+            <i class="ri-loader-4-line" style="color: #f59e0b; margin-right: 0.5rem;"></i> 待处理队列
+          </h2>
+          <button onclick="location.reload()" style="background:transparent; border:none; color:#64748b; cursor:pointer; font-size:0.9rem; display:flex; align-items:center; gap:4px;">
+            <i class="ri-refresh-line"></i> 刷新列表
+          </button>
         </div>
 
-        <section class="grid-card">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
-            <h2 style="margin: 0; font-size: 1.4rem; color: #1e293b; font-weight: 700;">
-              <i class="ri-loader-4-line" style="color: #f59e0b; margin-right: 0.5rem;"></i> 待处理队列
-            </h2>
-            <button onclick="location.reload()" style="background:transparent; border:none; color:#64748b; cursor:pointer; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
-              <i class="ri-refresh-line"></i> 刷新列表
-            </button>
-          </div>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr><th style="width: 25%;">申请用户</th><th style="width: 30%;">音乐信息</th><th style="width: 15%;">提交时间</th><th style="width: 30%; text-align: right;">审核操作</th></tr>
+            </thead>
+            <tbody>
+              {% for item in pending %}
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #4338ca; font-weight: bold;">
+                        {{ item.owner.nickname[0] }}
+                      </div>
+                      <div>
+                        <div style="font-weight: 700; color: #1e293b;">{{ item.owner.nickname }}</div>
+                        <div style="font-size: 0.85rem; color: #64748b; font-family: monospace;">UID: {{ item.owner.id }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div style="font-weight: 600; color: #334155;">{{ item.title }}</div>
+                    <div style="font-size: 0.85rem; color: #64748b; display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                      <i class="ri-file-music-line"></i> {{ item.original_filename }}
+                    </div>
+                  </td>
+                  <td style="color: #64748b; font-weight: 500;">{{ item.uploaded_at.strftime('%m-%d %H:%M') }}</td>
+                  <td class="actions" style="text-align: right;">
+                    <div style="display: flex; gap: 0.8rem; justify-content: flex-end;">
+                      <form method="post" action="{{ url_for('admin.approve_music', music_id=item.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <button class="icon-btn-text success" style="background: #10b981; color: white; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);">
+                          <i class="ri-check-double-line"></i> 通过
+                        </button>
+                      </form>
+                      <form method="post" action="{{ url_for('admin.reject_music', music_id=item.id) }}" style="display:flex; gap:0.5rem;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <input class="input-tiny" name="reason" placeholder="驳回理由..." required style="background: rgba(255,255,255,0.8); width: 140px;" />
+                        <button class="icon-btn-text danger" style="background: #ef4444; color: white; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);">
+                          <i class="ri-close-circle-line"></i>
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4" style="text-align: center; padding: 5rem 0; color: #94a3b8;">
+                  <div style="font-size: 4rem; opacity: 0.2; margin-bottom: 1rem;"><i class="ri-inbox-line"></i></div>
+                  <div style="font-size: 1.1rem;">暂无待处理的音乐申请</div>
+                </td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-          <div class="table-scroll">
-            <table class="data-table">
-              <thead>
-                <tr><th style="width: 25%;">申请用户</th><th style="width: 30%;">音乐信息</th><th style="width: 15%;">提交时间</th><th style="width: 30%; text-align: right;">审核操作</th></tr>
-              </thead>
-              <tbody>
-                {% for item in pending %}
-                  <tr>
-                    <td>
-                      <div style="display: flex; align-items: center; gap: 12px;">
-                        <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #4338ca; font-weight: bold; font-size: 1.1rem;">
-                          {{ item.owner.nickname[0] }}
-                        </div>
-                        <div>
-                          <div style="font-weight: 700; color: #1e293b; font-size: 1.05rem;">{{ item.owner.nickname }}</div>
-                          <div style="font-size: 0.85rem; color: #64748b; font-family: monospace;">UID: {{ item.owner.id }}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div style="font-weight: 700; color: #334155; font-size: 1.1rem;">{{ item.title }}</div>
-                      <div style="font-size: 0.9rem; color: #64748b; display: flex; align-items: center; gap: 6px; margin-top: 4px;">
-                        <i class="ri-file-music-line"></i> {{ item.original_filename }}
-                      </div>
-                    </td>
-                    <td style="color: #64748b; font-weight: 500;">{{ item.uploaded_at.strftime('%m-%d %H:%M') }}</td>
-                    <td class="actions" style="text-align: right;">
-                      <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                        <form method="post" action="{{ url_for('admin.approve_music', music_id=item.id) }}">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                          <button class="icon-btn-text success" style="background: #10b981; color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">
-                            <i class="ri-check-double-line"></i> 通过
-                          </button>
-                        </form>
-                        <form method="post" action="{{ url_for('admin.reject_music', music_id=item.id) }}" style="display:flex; gap:0.5rem;">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                          <input class="input-tiny" name="reason" placeholder="驳回理由..." required style="background: rgba(255,255,255,0.8); width: 140px;" />
-                          <button class="icon-btn-text danger" style="background: #ef4444; color: white; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);">
-                            <i class="ri-close-circle-line"></i>
-                          </button>
-                        </form>
-                      </div>
-                    </td>
-                  </tr>
-                {% else %}
-                  <tr><td colspan="4" style="text-align: center; padding: 6rem 0; color: #94a3b8;">
-                    <div style="font-size: 5rem; opacity: 0.15; margin-bottom: 1rem;"><i class="ri-inbox-line"></i></div>
-                    <div style="font-size: 1.2rem; font-weight: 500;">暂无待处理的音乐申请</div>
-                  </td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="grid-card" style="margin-top: 3rem;">
-          <div style="margin-bottom: 2rem;">
-            <h2 style="margin: 0; font-size: 1.4rem; color: #64748b; font-weight: 600;">
-              <i class="ri-history-line" style="margin-right: 0.5rem;"></i> 最近驳回记录
-            </h2>
-          </div>
-          <div class="table-scroll">
-            <table class="data-table">
-              <thead>
-                <tr><th style="width: 25%;">申请用户</th><th style="width: 30%;">音乐信息</th><th style="width: 20%;">操作时间</th><th style="width: 25%;">驳回原因</th></tr>
-              </thead>
-              <tbody>
-                {% for item in rejected %}
-                  <tr>
-                    <td>
-                      <span style="font-weight: 600; color: #64748b;">{{ item.owner.nickname }}</span>
-                    </td>
-                    <td>{{ item.title }}</td>
-                    <td>{{ item.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                    <td><span style="color: #b91c1c; background: #fecaca; padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;">{{ item.rejection_reason }}</span></td>
-                  </tr>
-                {% else %}
-                  <tr><td colspan="4" style="text-align: center; padding: 4rem; color: #cbd5e1;">暂无驳回记录</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      {% endblock %}
-    </div>
+      <section class="grid-card" style="margin-top: 3rem;">
+        <div style="margin-bottom: 1.5rem;">
+          <h2 style="margin: 0; font-size: 1.25rem; color: #64748b; font-weight: 600;">
+            <i class="ri-history-line" style="margin-right: 0.5rem;"></i> 最近驳回记录
+          </h2>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr><th style="width: 25%;">申请用户</th><th style="width: 30%;">音乐信息</th><th style="width: 20%;">操作时间</th><th style="width: 25%;">驳回原因</th></tr>
+            </thead>
+            <tbody>
+              {% for item in rejected %}
+                <tr>
+                  <td>
+                    <span style="font-weight: 600; color: #64748b;">{{ item.owner.nickname }}</span>
+                  </td>
+                  <td>{{ item.title }}</td>
+                  <td>{{ item.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                  <td><span style="color: #b91c1c; background: #fecaca; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">{{ item.rejection_reason }}</span></td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4" style="text-align: center; padding: 3rem; color: #cbd5e1;">暂无驳回记录</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endblock %}
   </main>
 </div>
 {% endblock %}

@@ -1,6 +1,75 @@
 {% extends "admin/dashboard.html" %}
 
 {% block admin_main %}
+
+<style>
+    /* --- 权限可视化样式 --- */
+    .perm-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+        max-height: 400px;
+        overflow-y: auto;
+        padding-right: 5px;
+    }
+
+    .perm-card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 0.8rem;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        transition: transform 0.2s;
+    }
+
+    .perm-card:hover {
+        transform: translateX(4px);
+        border-color: #cbd5e1;
+    }
+
+    .perm-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 700;
+        color: #475569;
+        font-size: 0.9rem;
+        border-bottom: 1px dashed #f1f5f9;
+        padding-bottom: 0.4rem;
+    }
+
+    .perm-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    .p-badge {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* 权限颜色定义 */
+    .p-select { background: #eff6ff; color: #3b82f6; border: 1px solid #dbeafe; } /* 读-蓝 */
+    .p-insert { background: #f0fdf4; color: #16a34a; border: 1px solid #dcfce7; } /* 增-绿 */
+    .p-update { background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; } /* 改-橙 */
+    .p-delete { background: #fef2f2; color: #dc2626; border: 1px solid #fee2e2; } /* 删-红 */
+    .p-all    { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; box-shadow: 0 2px 5px rgba(245, 158, 11, 0.3); } /* 超级权限-金 */
+
+    /* 特殊标记 */
+    .danger-zone {
+        border: 1px solid #fca5a5;
+        background: #fff1f2;
+    }
+</style>
+
 <div class="module-header">
   <div class="module-title">
     <h1><i class="{{ icon }}" style="color: #6366f1; font-size: 0.9em; vertical-align: middle;"></i> {{ title }}</h1>
@@ -12,6 +81,7 @@
     </span>
   </div>
 </div>
+
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 2.5rem;">
 
@@ -332,32 +402,186 @@
         </table>
       </div>
     </div>
-  {% elif active_page == 'security' %}
-    <div class="dashboard-card" style="border: 1px solid rgba(239, 68, 68, 0.3) !important;">
-      <div class="card-content">
-        <h3 style="margin-top: 0; color: #b91c1c;"><i class="ri-error-warning-line" style="margin-right: 8px;"></i> 事务级用户封禁</h3>
-        <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">
-          <span style="background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 700;">ACID 事务</span>
-          原子性执行：锁定用户 <i class="ri-arrow-right-line"></i> 关闭房间 <i class="ri-arrow-right-line"></i> 下架音乐。
-        </p>
-        <form method="post" action="{{ url_for('admin.manage_user_transaction') }}" style="display: flex; gap: 0.8rem; margin-top: auto;">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="text" name="target_username" placeholder="输入用户名" class="input-tiny" style="flex:1; padding: 1rem; border-radius: 12px; font-size: 1rem; background: rgba(255,255,255,0.5);">
-          <button class="modern-action-btn" style="background: #ef4444; color: white; padding: 0 1.5rem; border-radius: 12px; font-size: 1rem;">封禁</button>
-        </form>
-      </div>
-    </div>
-    <div class="dashboard-card">
-      <div class="card-content">
-        <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-shield-keyhole-line" style="color: #10b981; margin-right: 8px;"></i> 权限视图</h3>
-        <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">查看当前数据库连接用户的权限分配 (SHOW GRANTS)，确保最小权限原则。</p>
-        <div style="margin-top: auto;">
-            <button class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; color: #10b981; padding: 1rem; width: 100%; border-radius: 12px; font-size: 1rem;">
-              <i class="ri-eye-2-line"></i> 查看权限
-            </button>
+
+   {# --- 模块：权限和事务 --- #}
+    {% elif active_page == 'security' %}
+      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+      <div class="dashboard-card" style="border: 1px solid rgba(239, 68, 68, 0.3) !important;">
+        <div class="card-content">
+          <h3 style="margin-top: 0; color: #b91c1c;"><i class="ri-error-warning-line" style="margin-right: 8px;"></i> 事务级用户封禁</h3>
+          <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">
+            <span style="background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 700;">ACID 事务</span>
+            原子性执行：锁定用户 <i class="ri-arrow-right-line"></i> 关闭房间 <i class="ri-arrow-right-line"></i> 下架音乐。
+          </p>
+          <form method="post" action="{{ url_for('admin.manage_user_transaction') }}" style="display: flex; gap: 0.8rem; margin-top: auto;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="target_username" placeholder="输入用户名" class="input-tiny" style="flex:1; padding: 1rem; border-radius: 12px; font-size: 1rem; background: rgba(255,255,255,0.5);">
+            <button class="modern-action-btn" style="background: #ef4444; color: white; padding: 0 1.5rem; border-radius: 12px; font-size: 1rem;">封禁</button>
+          </form>
         </div>
       </div>
-    </div>
+
+      <div class="dashboard-card">
+        <div class="card-content">
+          <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-shield-keyhole-line" style="color: #10b981; margin-right: 8px;"></i> 权限视图</h3>
+          <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">查看当前数据库连接用户的权限分配 (SHOW GRANTS)，确保最小权限原则。</p>
+          <div style="margin-top: auto;">
+              <button id="btn-view-perms" class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; color: #10b981; padding: 1rem; width: 100%; border-radius: 12px; font-size: 1rem; cursor: pointer;">
+                <i class="ri-eye-2-line"></i> 查看权限对比 (DAC)
+              </button>
+          </div>
+        </div>
+      </div>
+
+      <script>
+// --- 权限解析器：将原始 SQL 转化为结构化对象 ---
+function parseGrants(grantsArray) {
+    const permissions = [];
+    let isSuperUser = false;
+
+    grantsArray.forEach(sql => {
+        // 1. 检查是否是超级管理员 (ALL PRIVILEGES)
+        if (sql.includes("ALL PRIVILEGES") || sql.includes("GRANT ALL ON *.*")) {
+            isSuperUser = true;
+            return;
+        }
+
+        // 2. 正则提取：GRANT [权限...] ON [库.表] TO ...
+        // 匹配示例: GRANT SELECT, INSERT ON `voice_share`.`musics` TO
+        const match = sql.match(/GRANT\s+(.*?)\s+ON\s+`?.*?`?\.`?(.*?)`?\s+TO/i);
+
+        if (match) {
+            const rawPerms = match[1]; // 例如 "SELECT, INSERT, UPDATE"
+            const tableName = match[2]; // 例如 "musics"
+
+            permissions.push({
+                table: tableName,
+                rights: rawPerms.split(',').map(p => p.trim())
+            });
+        }
+    });
+
+    return { isSuperUser, permissions };
+}
+
+// --- 渲染器：生成 HTML ---
+function renderPermsHTML(data) {
+    if (data.isSuperUser) {
+        return `
+            <div class="perm-card danger-zone" style="text-align:center; padding: 2rem;">
+                <div style="font-size: 3rem; color: #d97706; margin-bottom: 1rem;"><i class="ri-vip-crown-2-fill"></i></div>
+                <h3 style="color: #92400e; margin:0;">Root / Admin 级权限</h3>
+                <p style="color: #b45309; font-size: 0.9rem;">拥有数据库最高控制权 (ALL PRIVILEGES)</p>
+                <div class="perm-badges" style="justify-content:center; margin-top:1rem;">
+                    <span class="p-badge p-all"><i class="ri-flashlight-fill"></i> 删库跑路</span>
+                    <span class="p-badge p-all"><i class="ri-database-2-fill"></i> 数据恢复</span>
+                    <span class="p-badge p-all"><i class="ri-eye-fill"></i> 审计查看</span>
+                </div>
+            </div>
+        `;
+    }
+
+    if (data.permissions.length === 0) {
+        return `<div style="color:#94a3b8; text-align:center; padding:1rem;">无特定权限或解析失败</div>`;
+    }
+
+    return data.permissions.map(item => {
+        // 生成标签
+        const badges = item.rights.map(r => {
+            if (r.includes('SELECT')) return `<span class="p-badge p-select"><i class="ri-eye-line"></i> 查 (Select)</span>`;
+            if (r.includes('INSERT')) return `<span class="p-badge p-insert"><i class="ri-add-line"></i> 增 (Insert)</span>`;
+            if (r.includes('UPDATE')) return `<span class="p-badge p-update"><i class="ri-edit-line"></i> 改 (Update)</span>`;
+            if (r.includes('DELETE')) return `<span class="p-badge p-delete"><i class="ri-delete-bin-line"></i> 删 (Delete)</span>`;
+            return `<span class="p-badge" style="background:#f1f5f9; color:#64748b;">${r}</span>`;
+        }).join('');
+
+        // 表图标逻辑
+        let icon = 'ri-table-line';
+        if (item.table.includes('user')) icon = 'ri-user-settings-line';
+        if (item.table.includes('music')) icon = 'ri-disc-line';
+        if (item.table.includes('room')) icon = 'ri-home-heart-line';
+        if (item.table.includes('log')) icon = 'ri-file-list-line';
+
+        return `
+            <div class="perm-card">
+                <div class="perm-header">
+                    <i class="${icon}" style="color: #6366f1;"></i> ${item.table}
+                </div>
+                <div class="perm-badges">
+                    ${badges}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+document.getElementById('btn-view-perms').addEventListener('click', async () => {
+    // 1. Loading
+    Swal.fire({
+        title: '正在审计权限配置...',
+        html: '<div style="color:#64748b">正在对比 DAC 访问控制列表 (ACL)</div>',
+        didOpen: () => Swal.showLoading()
+    });
+
+    try {
+        // 2. Fetch
+        const response = await fetch("{{ url_for('admin.get_security_grants') }}");
+        const res = await response.json();
+
+        if (res.status === 'success') {
+            // 3. 解析数据
+            const normalData = parseGrants(res.data.normal);
+            const adminData = parseGrants(res.data.admin);
+
+            // 4. 生成 HTML
+            const normalHTML = `<div class="perm-container">${renderPermsHTML(normalData)}</div>`;
+            const adminHTML = `<div class="perm-container">${renderPermsHTML(adminData)}</div>`;
+
+            // 5. 弹窗展示 (宽屏模式)
+            Swal.fire({
+                title: '自主存取控制 (DAC) 审计报告',
+                width: '900px',
+                html: `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; text-align: left; margin-top: 1rem;">
+
+                        <div style="background: #f8fafc; padding: 1.2rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+                            <h4 style="color: #475569; margin:0 0 1rem 0; display:flex; align-items:center; gap:8px; border-bottom:2px solid #cbd5e1; padding-bottom:0.5rem;">
+                                <i class="ri-user-line" style="background:#cbd5e1; color:#fff; padding:4px; border-radius:50%;"></i>
+                                普通通道 (vs_normal)
+                            </h4>
+                            ${normalHTML}
+                            <div style="margin-top:1rem; font-size:0.8rem; color:#10b981; background:#ecfdf5; padding:0.5rem; border-radius:6px;">
+                                <i class="ri-shield-check-line"></i> 安全策略：禁止删除用户表，无法访问审计日志。
+                            </div>
+                        </div>
+
+                        <div style="background: #fff7ed; padding: 1.2rem; border-radius: 12px; border: 1px solid #ffedd5;">
+                            <h4 style="color: #9a3412; margin:0 0 1rem 0; display:flex; align-items:center; gap:8px; border-bottom:2px solid #fdba74; padding-bottom:0.5rem;">
+                                <i class="ri-shield-star-line" style="background:#fb923c; color:#fff; padding:4px; border-radius:50%;"></i>
+                                特权通道 (vs_admin)
+                            </h4>
+                            ${adminHTML}
+                            <div style="margin-top:1rem; font-size:0.8rem; color:#b45309; background:#fffbeb; padding:0.5rem; border-radius:6px;">
+                                <i class="ri-alert-line"></i> 风险提示：拥有全库读写权限，需谨慎操作。
+                            </div>
+                        </div>
+
+                    </div>
+                `,
+                confirmButtonText: '验证通过 (Verified)',
+                confirmButtonColor: '#10b981',
+                showCloseButton: true
+            });
+        } else {
+            Swal.fire('查询失败', res.message, 'error');
+        }
+    } catch (err) {
+        console.error(err);
+        Swal.fire('执行错误', String(err), 'error');
+    }
+});
+</script>
 
 {# --- 模块：灾备管理 --- #}
   {% elif active_page == 'backup' %}

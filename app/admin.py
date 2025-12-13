@@ -458,3 +458,31 @@ def reject_music(music_id):
     db.session.commit()
     flash("音乐已驳回", "info")
     return redirect(url_for("admin.dashboard"))
+
+
+
+@admin_bp.route("/security/grants")
+@login_required
+def get_security_grants():
+    _admin_required()
+    try:
+        # 1. 获取【普通通道】的权限 (vs_normal)
+        # 使用默认的 db.session 执行
+        normal_grants = db.session.execute(text("SHOW GRANTS FOR CURRENT_USER()")).scalars().all()
+
+        # 2. 获取【特权通道】的权限 (vs_admin)
+        # 显式获取 admin_db 引擎执行
+        admin_engine = db.get_engine(bind='admin_db')
+        with admin_engine.connect() as conn:
+            admin_grants = conn.execute(text("SHOW GRANTS FOR CURRENT_USER()")).scalars().all()
+
+        return jsonify({
+            "status": "success",
+            "data": {
+                "normal": normal_grants,
+                "admin": admin_grants
+            }
+        })
+    except Exception as e:
+        print(f"权限查询出错: {e}") # 打印到后台终端方便调试
+        return jsonify({"status": "error", "message": str(e)}), 500

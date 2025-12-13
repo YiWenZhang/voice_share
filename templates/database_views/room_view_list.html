@@ -85,14 +85,43 @@
 
 <section class="grid-card">
   <div class="table-scroll">
+
     <table class="data-table">
+
       <thead>
         <tr>
           {% for key in selected_cols %}
-            <th style="{{ 'padding-left: 1.5rem;' if loop.first }}">{{ all_columns[key].name }}</th>
+            {% set col_info = all_columns[key] %}
+
+            {% set next_order = 'asc' if (current_sort == key and current_order == 'desc') else 'desc' %}
+
+            <th style="{{ 'padding-left: 1.5rem;' if loop.first }} cursor: pointer; user-select: none;"
+                title="点击按 {{ col_info.name }} {{ '升序' if next_order == 'asc' else '降序' }}排列"
+                onclick="window.location.href='{{ url_for(request.endpoint, **dict(request.args, sort=key, order=next_order)) }}'">
+
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span>{{ col_info.name }}</span>
+
+                <span style="display: flex; flex-direction: column; font-size: 0.6rem; color: #cbd5e1;">
+                  {% if current_sort == key %}
+                    {% if current_order == 'asc' %}
+                      <i class="ri-arrow-up-s-fill" style="color: #6366f1; margin-bottom: -4px;"></i>
+                      <i class="ri-arrow-down-s-fill" style="opacity: 0.3;"></i>
+                    {% else %}
+                      <i class="ri-arrow-up-s-fill" style="opacity: 0.3; margin-bottom: -4px;"></i>
+                      <i class="ri-arrow-down-s-fill" style="color: #6366f1;"></i>
+                    {% endif %}
+                  {% else %}
+                    <i class="ri-arrow-up-s-fill" style="margin-bottom: -4px;"></i>
+                    <i class="ri-arrow-down-s-fill"></i>
+                  {% endif %}
+                </span>
+              </div>
+            </th>
           {% endfor %}
         </tr>
       </thead>
+
       <tbody>
         {% for r in rooms %}
         <tr>
@@ -137,6 +166,7 @@
         {% endfor %}
       </tbody>
     </table>
+
   </div>
 </section>
 {% endblock %}

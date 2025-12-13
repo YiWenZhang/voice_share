@@ -191,6 +191,16 @@ def init_db_with_raw_sql(db):
         """
         CREATE INDEX idx_room_active ON room(is_active);
         """,
+        # [新增] 听歌记录查询优化索引
+        """
+        CREATE INDEX idx_listen_song ON listen_record(song_name);
+        """,
+        """
+        CREATE INDEX idx_listen_time ON listen_record(played_at);
+        """,
+        """
+        CREATE INDEX idx_user_username ON user(username);
+        """,
     ]
 
 

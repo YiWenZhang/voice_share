@@ -5,7 +5,7 @@
 <div class="module-header">
   <div class="module-title">
     <h1><i class="ri-history-line" style="color: #10b981;"></i> 听歌行为流水</h1>
-    <p>实时追踪全站用户的播放记录与行为 (Limit 100)</p>
+    <p>全站用户播放行为追踪 (Table: <code>listen_record</code> JOIN <code>user</code>)</p>
   </div>
   <div class="header-status">
     <a href="{{ url_for('db_views.admin_query_center') }}" class="modern-action-btn" style="background: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.6); padding: 0.6rem 1.2rem; border-radius: 99px; cursor: pointer; color: #475569; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
@@ -14,37 +14,141 @@
   </div>
 </div>
 
+<section class="dashboard-card" style="margin-bottom: 2rem; padding: 1.5rem; border-top: 4px solid #10b981;">
+
+  <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.8rem; background: #ecfdf5; padding: 0.8rem 1rem; border-radius: 8px; border: 1px dashed #6ee7b7;">
+    <i class="ri-database-2-line" style="color: #047857;"></i>
+    <span style="font-size: 0.9rem; color: #065f46; font-weight: 500;">
+      <strong>技术驱动：</strong> 采用原生 SQL 连接查询 (JOIN)，已针对 歌名、用户昵称、账号 建立索引，支持多维度快速回溯用户行为。
+    </span>
+  </div>
+
+  <form method="get" action="{{ url_for('db_views.admin_record_view_query') }}" style="display: flex; flex-direction: column; gap: 1.2rem;">
+
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+
+      <div style="flex: 2; min-width: 160px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+          <i class="ri-disc-line" style="color: #8b5cf6; margin-right: 4px;"></i> 歌曲名称
+        </label>
+        <input type="text" name="q_song" value="{{ q_song }}" placeholder="搜歌名..."
+               style="width: 100%; padding: 0.7rem 1rem; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem;">
+      </div>
+
+      <div style="flex: 1.5; min-width: 140px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+          <i class="ri-user-smile-line" style="color: #f59e0b; margin-right: 4px;"></i> 用户昵称
+        </label>
+        <input type="text" name="q_nickname" value="{{ q_nickname }}" placeholder="搜昵称..."
+               style="width: 100%; padding: 0.7rem 1rem; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem;">
+      </div>
+
+      <div style="flex: 1.5; min-width: 140px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+          <i class="ri-at-line" style="color: #3b82f6; margin-right: 4px;"></i> 账号
+        </label>
+        <input type="text" name="q_username" value="{{ q_username }}" placeholder="搜账号..."
+               style="width: 100%; padding: 0.7rem 1rem; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem;">
+      </div>
+
+      <div style="flex: 1; min-width: 100px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+          <i class="ri-fingerprint-line" style="color: #64748b; margin-right: 4px;"></i> UID
+        </label>
+        <input type="number" name="q_uid" value="{{ q_uid }}" placeholder="精确ID"
+               style="width: 100%; padding: 0.7rem 1rem; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem;">
+      </div>
+
+      <button type="submit" class="modern-action-btn" style="flex: 0 0 auto; background: linear-gradient(135deg, #10b981, #34d399); color: #fff; padding: 0 1.8rem; height: 42px; border-radius: 10px; margin-bottom: 1px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); white-space: nowrap;">
+        <i class="ri-search-2-line" style="margin-right: 4px;"></i> 查询
+      </button>
+
+    </div>
+
+    <div style="padding-top: 1.2rem; border-top: 1px dashed #e2e8f0;">
+      <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #64748b; margin-bottom: 0.8rem;">
+        <i class="ri-layout-column-line"></i> 自定义结果列:
+      </label>
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        {% for key, conf in all_columns.items() %}
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; color: #334155; background: #fff; padding: 6px 12px; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.2s;">
+            <input type="checkbox" name="cols" value="{{ key }}" {{ 'checked' if key in selected_cols }} style="accent-color: #10b981;">
+            {{ conf.name }}
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+  </form>
+</section>
+
 <section class="grid-card">
   <div class="table-scroll">
     <table class="data-table">
       <thead>
         <tr>
-          <th style="padding-left: 1.5rem;">时间</th>
-          <th>用户</th>
-          <th>播放歌曲</th>
-          <th>记录ID</th>
+          {% for key in selected_cols %}
+            {% set col_info = all_columns[key] %}
+            {% set next_order = 'asc' if (current_sort == key and current_order == 'desc') else 'desc' %}
+
+            <th style="{{ 'padding-left: 1.5rem;' if loop.first }} cursor: pointer; user-select: none;"
+                title="点击按 {{ col_info.name }} {{ '升序' if next_order == 'asc' else '降序' }}排列"
+                onclick="window.location.href='{{ url_for(request.endpoint, **dict(request.args, sort=key, order=next_order)) }}'">
+
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span>{{ col_info.name }}</span>
+                <span style="display: flex; flex-direction: column; font-size: 0.6rem; color: #cbd5e1;">
+                  {% if current_sort == key %}
+                    {% if current_order == 'asc' %}
+                      <i class="ri-arrow-up-s-fill" style="color: #10b981; margin-bottom: -4px;"></i>
+                      <i class="ri-arrow-down-s-fill" style="opacity: 0.3;"></i>
+                    {% else %}
+                      <i class="ri-arrow-up-s-fill" style="opacity: 0.3; margin-bottom: -4px;"></i>
+                      <i class="ri-arrow-down-s-fill" style="color: #10b981;"></i>
+                    {% endif %}
+                  {% else %}
+                    <i class="ri-arrow-up-s-fill" style="margin-bottom: -4px;"></i>
+                    <i class="ri-arrow-down-s-fill"></i>
+                  {% endif %}
+                </span>
+              </div>
+            </th>
+          {% endfor %}
         </tr>
       </thead>
       <tbody>
         {% for r in records %}
         <tr>
-          <td style="padding-left: 1.5rem; color: #64748b; font-weight: 500;">{{ r.played_at.strftime('%m-%d %H:%M:%S') }}</td>
-          <td>
-            <span style="font-weight: 700; color: #1e293b;">{{ r.nickname }}</span>
-            <span style="color: #94a3b8; font-size: 0.85rem; margin-left: 4px;">(@{{ r.username }})</span>
-          </td>
-          <td>
-            <div style="display: flex; align-items: center; gap: 8px; color: #334155;">
-              <div style="width: 24px; height: 24px; background: rgba(139, 92, 246, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #8b5cf6;">
-                <i class="ri-disc-line" style="font-size: 0.8rem;"></i>
-              </div>
-              <span style="font-weight: 600;">{{ r.song_name }}</span>
-            </div>
-          </td>
-          <td style="font-family: monospace; color: #cbd5e1;">#{{ r.id }}</td>
+          {% for key in selected_cols %}
+            {% if key == 'id' %}
+              <td style="padding-left: 1.5rem; color: #64748b; font-family: monospace;">#{{ r.id }}</td>
+
+            {% elif key == 'song' %}
+              <td>
+                <div style="display: flex; align-items: center; gap: 8px; color: #334155;">
+                  <div style="width: 24px; height: 24px; background: rgba(139, 92, 246, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #8b5cf6;">
+                    <i class="ri-disc-line" style="font-size: 0.8rem;"></i>
+                  </div>
+                  <span style="font-weight: 600;">{{ r.song_name }}</span>
+                </div>
+              </td>
+
+            {% elif key == 'nickname' %}
+              <td><span style="font-weight: 600; color: #1e293b;">{{ r.nickname }}</span></td>
+
+            {% elif key == 'username' %}
+              <td><span style="color: #64748b; font-family: monospace;">{{ r.username }}</span></td>
+
+            {% elif key == 'uid' %}
+              <td><span style="color: #94a3b8; font-size: 0.9rem;">ID: {{ r.user_id }}</span></td>
+
+            {% elif key == 'time' %}
+              <td style="color: #64748b; font-weight: 500;">{{ r.played_at.strftime('%m-%d %H:%M:%S') }}</td>
+            {% endif %}
+          {% endfor %}
         </tr>
         {% else %}
-        <tr><td colspan="4" style="text-align: center; padding: 4rem 0; color: #64748b;">暂无数据</td></tr>
+        <tr><td colspan="{{ selected_cols|length }}" style="text-align: center; padding: 4rem 0; color: #64748b;">暂无匹配数据</td></tr>
         {% endfor %}
       </tbody>
     </table>

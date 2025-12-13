@@ -19,6 +19,15 @@ class Config:
         "admin_db": os.environ.get("DATABASE_URL_ADMIN")
     }
 
+    # 设置每次新连接自动使用 READ COMMITTED 隔离级别
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "connect_args": {
+            "init_command": "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED"
+        },
+        "pool_pre_ping": True,
+        "pool_recycle": 300
+    }
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     MAX_CONTENT_LENGTH = 60 * 1024 * 1024  # 60 MB upper bound for uploads
     UPLOAD_FOLDER = BASE_DIR / "static" / "uploads"

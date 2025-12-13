@@ -6,6 +6,7 @@ from .models import Music, User, Room
 import json
 import io
 from datetime import datetime
+from flask import jsonify
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -88,6 +89,7 @@ def db_health():
                 'listen_record': '记录用户的听歌历史流水',
                 'room_participation_record': '记录用户的房间访问足迹',
                 'room_playlist': '存储各房间当前的排队播放列表',
+                'system_audit_log':'存储流水的审计日志表',
                 # 视图描述
                 'v_music_full_info': '聚合查询：音乐+用户信息的完整视图',
                 'v_room_stats': '统计视图：计算房间实时热度和在线人数'
@@ -182,7 +184,8 @@ def db_backup():
 # 2. 功能操作路由 (Action Buttons) - 解决 BuildError 的关键
 # ==============================================================================
 
-# --- [模块：自动化] 1. 执行存储过程 ---
+
+# --- [模块：自动化] 1. 执行存储过程 (AJAX版) ---
 @admin_bp.route("/maintenance/exec", methods=["POST"])
 @login_required
 def exec_maintenance():
@@ -191,12 +194,17 @@ def exec_maintenance():
         # 调用存储过程 sp_daily_maintenance
         db.session.execute(text("CALL sp_daily_maintenance()"))
         db.session.commit()
-        flash("每日维护存储过程执行成功！过期数据已清理。", "success")
+        # [修改] 不再用 flash+redirect，而是返回 JSON
+        return jsonify({
+            "status": "success",
+            "message": "每日维护存储过程执行成功！\n已清理 1 天前的过期记录与僵尸房间。"
+        })
     except Exception as e:
         db.session.rollback()
-        # 注意：如果存储过程未创建，这里会报错。请确保 ran create_with_sql.py
-        flash(f"执行失败 (请检查存储过程是否存在): {str(e)}", "error")
-    return redirect(url_for("admin.db_automation"))
+        return jsonify({
+            "status": "error",
+            "message": f"执行失败: {str(e)}"
+        }), 500
 
 
 # --- [模块：自动化] 2. 查看审计日志 ---

@@ -177,28 +177,37 @@
       </div>
     {% endif %}
 
-  {# 其他页面逻辑保持不变 #}
+{# --- 模块：自动化运维 --- #}
   {% elif active_page == 'automation' %}
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <div class="dashboard-card">
       <div class="card-content">
-        <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-calendar-check-line" style="color: #8b5cf6; margin-right: 8px;"></i> 每日维护任务</h3>
+        <h3 style="margin-top: 0; color: #1e293b;">
+            <i class="ri-calendar-check-line" style="color: #8b5cf6; margin-right: 8px;"></i> 每日维护任务
+        </h3>
         <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">
           调用存储过程 <code>CALL sp_daily_maintenance()</code><br>
-          自动清理 30 天前的临时日志与过期会话。
+          自动清理 1 天前的临时日志与过期会话，释放空间。
         </p>
-        <form method="post" action="{{ url_for('admin.exec_maintenance') }}" style="margin-top: auto;">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="modern-action-btn" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); color: #fff; padding: 1rem; width: 100%; border-radius: 12px; font-size: 1rem;">
-            <i class="ri-play-circle-line"></i> 立即执行 (Call SP)
-          </button>
-        </form>
+
+        <div style="margin-top: auto;">
+            <button id="btn-run-maintenance" class="modern-action-btn" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); color: #fff; padding: 1rem; width: 100%; border-radius: 12px; font-size: 1rem; border: none; cursor: pointer;">
+                <i class="ri-play-circle-line"></i> 立即执行 (Run SP)
+            </button>
+        </div>
       </div>
     </div>
+
     <div class="dashboard-card">
       <div class="card-content">
-        <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-file-search-line" style="color: #3b82f6; margin-right: 8px;"></i> 审计日志</h3>
+        <h3 style="margin-top: 0; color: #1e293b;">
+            <i class="ri-file-search-line" style="color: #3b82f6; margin-right: 8px;"></i> 审计日志
+        </h3>
         <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">
-          基于触发器 <code>trg_music_delete</code> 自动捕获的敏感操作流水，确保数据变更可追溯。
+          基于触发器 <code>trg_room_join_audit</code> 自动监控。<br>
+          <span style="color: #0f766e; font-weight: 600; background: #f0fdfa; padding: 0 4px; border-radius: 4px;">只要有用户加入房间</span>，无论通过何种方式，系统都会强制记录该行为，确保人员变更可追溯。
         </p>
         <div style="margin-top: auto;">
             <a href="{{ url_for('admin.audit_logs') }}" class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; color: #3b82f6; padding: 1rem; width: 100%; border-radius: 12px; display: block; text-align: center; text-decoration: none; font-size: 1rem;">
@@ -208,26 +217,121 @@
       </div>
     </div>
 
+    <script>
+    document.getElementById('btn-run-maintenance').addEventListener('click', function() {
+        // 1. 弹出确认框
+        Swal.fire({
+            title: '确认执行维护？',
+            text: "此操作将调用存储过程清理过期数据，且不可撤销。",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#8b5cf6', // 紫色按钮
+            cancelButtonColor: '#cbd5e1',
+            confirmButtonText: '是的，立即清理',
+            cancelButtonText: '取消',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // 2. 显示 Loading 状态
+                Swal.fire({
+                    title: '正在执行...',
+                    text: '数据库正在跑路（划掉）整理数据中',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                // 3. 发送 AJAX 请求给后端
+                fetch("{{ url_for('admin.exec_maintenance') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': "{{ csrf_token() }}" // 必须带上 CSRF Token
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // 4. 根据后端返回结果弹窗
+                    if (data.status === 'success') {
+                        Swal.fire({
+                            title: '清理成功!',
+                            text: data.message,
+                            icon: 'success',
+                            confirmButtonColor: '#10b981'
+                        });
+                    } else {
+                        Swal.fire({
+                            title: '执行失败',
+                            text: data.message,
+                            icon: 'error',
+                            confirmButtonColor: '#ef4444'
+                        });
+                    }
+                })
+                .catch(error => {
+                    Swal.fire({
+                        title: '网络错误',
+                        text: '无法连接到服务器',
+                        icon: 'error'
+                    });
+                });
+            }
+        });
+    });
+    </script>
+
+
+
+  {# --- 模块：审计日志列表视图 --- #}
   {% elif active_page == 'audit_logs_view' %}
     <div class="dashboard-card" style="grid-column: 1 / -1;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
-        <h3 style="margin:0; color: #1e293b;"><i class="ri-shield-check-line" style="color:#6366f1;"></i> 系统审计流水</h3>
-        <a href="{{ url_for('admin.db_automation') }}" class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; padding: 0.5rem 1rem; text-decoration:none; color: #64748b; border-radius: 8px;">返回</a>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;">
+        <h3 style="margin:0; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+            <i class="ri-shield-check-line" style="color:#6366f1;"></i> 系统审计流水
+            <span style="font-size: 0.8rem; color: #64748b; font-weight: normal; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">Trigger Generated</span>
+        </h3>
+        <a href="{{ url_for('admin.db_automation') }}" class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; padding: 0.5rem 1rem; text-decoration:none; color: #64748b; border-radius: 8px;">
+            <i class="ri-arrow-left-line"></i> 返回
+        </a>
       </div>
+
       <div class="table-scroll">
         <table class="data-table">
-          <thead><tr><th>ID</th><th>操作类型</th><th>表名</th><th>记录ID</th><th>详情</th><th>时间</th></tr></thead>
+          <thead>
+            <tr>
+                <th style="width: 80px;">ID</th>
+                <th style="width: 120px;">行为 (Type)</th>
+                <th style="width: 120px;">目标表 (Table)</th>
+                <th style="width: 100px;">记录ID</th>
+                <th>详情描述 (Details)</th>
+                <th style="width: 180px;">发生时间 (Time)</th>
+            </tr>
+          </thead>
           <tbody>
             {% for log in logs %}
-            <tr><td>{{ log.id }}</td><td><span style="background:rgba(254, 226, 226, 0.5); color:#ef4444; padding:2px 6px; border-radius:4px;">{{ log.action_type }}</span></td><td>{{ log.table_name }}</td><td>{{ log.record_id }}</td><td style="font-family:monospace; font-size:0.9rem;">{{ log.details }}</td><td>{{ log.action_time }}</td></tr>
+            <tr>
+                <td style="color: #64748b;">{{ log.id }}</td>
+                <td>
+                    <span style="background: rgba(224, 231, 255, 0.6); color: #4338ca; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.8rem;">
+                        {{ log.action_type }}
+                    </span>
+                </td>
+                <td style="font-family: monospace; color: #059669;">{{ log.table_name }}</td>
+                <td style="font-family: monospace;">#{{ log.record_id }}</td>
+                <td style="color: #334155;">{{ log.details }}</td>
+                <td style="color: #94a3b8; font-size: 0.9rem;">{{ log.action_time }}</td>
+            </tr>
             {% else %}
-            <tr><td colspan="6" style="text-align:center; padding:3rem; color: #94a3b8;">暂无审计记录</td></tr>
+            <tr><td colspan="6" style="text-align:center; padding:3rem; color: #94a3b8;">
+                <i class="ri-inbox-line" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+                暂无审计记录 (尝试去加入一个房间触发它！)
+            </td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
-
   {% elif active_page == 'security' %}
     <div class="dashboard-card" style="border: 1px solid rgba(239, 68, 68, 0.3) !important;">
       <div class="card-content">

@@ -124,14 +124,8 @@ def init_db_with_raw_sql(db):
         """,
         
         
-        # ==========================================
-        # [新增] 实验 1.4 视图定义
-        # 体现思想：
-        # 1. 简化复杂查询：预先定义 Join 连接，上层应用只需查单表。
-        # 2. 安全性：隐藏敏感字段（如密码、具体路径）。
-        # 3. 数据聚合：预先计算统计数据（Count, Sum）。
-        # ==========================================
 
+        # 视图定义
         # 视图 1: 音乐详情全貌视图 (v_music_full_info)
         # 作用：将 musics 表与 user 表通过 user_id 连接，用于管理员快速检索。
         """
@@ -166,7 +160,9 @@ def init_db_with_raw_sql(db):
         LEFT JOIN room_member rm ON r.id = rm.room_id
         GROUP BY r.id, r.code, r.name, r.is_active, r.owner_id;
         """,
-        # [新增] 3. 性能优化索引
+
+        # 索引
+        # 1.性能优化索引
         # 为高频查询字段添加索引，加速 WHERE 子句过滤
         """
         CREATE INDEX idx_music_title ON musics(title);
@@ -181,7 +177,7 @@ def init_db_with_raw_sql(db):
         CREATE INDEX idx_user_nickname ON user(nickname);
         """,
 
-        # [新增] 4.房间查询优化索引
+        #  2.房间查询优化索引
         """
         CREATE INDEX idx_room_name ON room(name);
         """,
@@ -191,7 +187,7 @@ def init_db_with_raw_sql(db):
         """
         CREATE INDEX idx_room_active ON room(is_active);
         """,
-        # [新增] 听歌记录查询优化索引
+        # 3.听歌记录查询优化索引
         """
         CREATE INDEX idx_listen_song ON listen_record(song_name);
         """,
@@ -200,6 +196,58 @@ def init_db_with_raw_sql(db):
         """,
         """
         CREATE INDEX idx_user_username ON user(username);
+        """,
+
+        # 存储过程与触发器 (自动化与审计)
+        # 1. 创建审计日志表
+        """
+        CREATE TABLE IF NOT EXISTS system_audit_log (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            action_type VARCHAR(32) NOT NULL,
+            table_name VARCHAR(64) NOT NULL,
+            record_id INT,
+            details TEXT,
+            action_time DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+
+        # 2. 定义存储过程: 每日维护 (sp_daily_maintenance)
+        # [修改点] 将 30 DAY 改为了 1 DAY
+        """
+        DROP PROCEDURE IF EXISTS sp_daily_maintenance;
+        """,
+
+        """
+        CREATE PROCEDURE sp_daily_maintenance()
+        BEGIN
+            -- 1. 清理过期听歌记录 (保留最近 1 天)
+            DELETE FROM listen_record 
+            WHERE played_at < DATE_SUB(NOW(), INTERVAL 1 DAY);
+
+            -- 2. 自动关闭“僵尸”房间 (超过 7 天没有更新的活跃房间)
+            UPDATE room 
+            SET is_active = 0, playback_status = 'paused'
+            WHERE is_active = 1 
+              AND updated_at < DATE_SUB(NOW(), INTERVAL 7 DAY);
+        END;
+        """,
+
+        # 3. 定义触发器: 房间成员审计 (trg_room_join_audit)
+        # 功能：每当有人加入房间，自动在审计表中记录
+        """
+        CREATE TRIGGER trg_room_join_audit 
+        AFTER INSERT ON room_member
+        FOR EACH ROW
+        BEGIN
+            INSERT INTO system_audit_log (action_type, table_name, record_id, details, action_time)
+            VALUES (
+                'JOIN', 
+                'room', 
+                NEW.room_id, 
+                CONCAT('User (ID: ', NEW.user_id, ') joined the room.'),
+                NOW()
+            );
+        END;
         """,
     ]
 
@@ -217,15 +265,17 @@ def init_db_with_raw_sql(db):
                 try:
                     connection.execute(text(sql))
                 except OperationalError as e:
-                    # [修改] 捕获 MySQL 错误 1061 (Duplicate key name)
-                    # 如果是因为索引已存在导致的错误，则打印提示并继续，不中断程序
-                    if e.orig.args[0] == 1061:
-                        print(f"提示: 索引或键已存在，跳过创建 -> {e.orig.args[1]}")
+                    # 错误码 1061: Duplicate key name (索引已存在)
+                    # 错误码 1050: Table already exists (表已存在)
+                    # 错误码 1304: PROCEDURE already exists (存储过程已存在)
+                    # 错误码 1359: TRIGGER already exists (触发器已存在)
+                    if e.orig.args[0] in (1061, 1050, 1304, 1359):
+                        print(f"提示: 对象已存在，跳过 -> {str(e.orig.args)}")
                     else:
-                        # 如果是其他错误 (如语法错误)，则正常抛出异常
+                        print(f"执行 SQL 出错: {sql[:50]}...")
                         raise e
 
             connection.commit()
-        print("数据库表及索引结构校验完成 (Success)。")
+        print("数据库表、索引及自动化脚本校验完成 (Success)。")
     except Exception as e:
         print(f"初始化过程发生未处理错误: {e}")

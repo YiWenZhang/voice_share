@@ -6,7 +6,7 @@ from .models import Music, User, Room
 import json
 import io
 from datetime import datetime
-from flask import jsonify
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for, Response, send_file, jsonify
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -271,54 +271,138 @@ def manage_user_transaction():
     return redirect(url_for("admin.db_security"))
 
 
-# --- [模块：灾备] 4. 数据库备份 ---
+
+# --- [模块：灾备] 4. 数据库全量备份 ---
 @admin_bp.route("/backup/download")
 @login_required
 def backup_db():
     _admin_required()
     try:
-        # 简单的 JSON 快照备份
+        # 定义需要备份的所有表名 (顺序建议：先父表后子表，虽然恢复时会关外键)
+        tables = [
+            'user', 'musics', 'room',
+            'room_member', 'room_playlist', 'room_message',
+            'listen_record', 'room_participation_record',
+            'system_audit_log'  # 连同审计日志一起备份
+        ]
+
+        # 构造备份数据结构
         data = {
-            'meta': {'backup_time': str(datetime.now())},
-            'users': [dict(u) for u in db.session.execute(text("SELECT * FROM user")).mappings().all()],
-            'rooms': [dict(r) for r in db.session.execute(text("SELECT * FROM room")).mappings().all()],
-            'musics': [dict(m) for m in db.session.execute(text("SELECT * FROM musics")).mappings().all()]
+            'meta': {
+                'backup_time': str(datetime.now()),
+                'version': '1.0',
+                'description': 'Voice Share Full Database Backup'
+            }
         }
 
+        # 遍历查询所有表数据
+        for t in tables:
+            try:
+                # 使用 mappings() 获取字典格式结果
+                rows = db.session.execute(text(f"SELECT * FROM {t}")).mappings().all()
+                # 将 RowMapping 转为普通 dict，并利用 default=str 处理 datetime 对象
+                data[t] = [dict(row) for row in rows]
+            except Exception as table_err:
+                # 如果某个表不存在（比如审计表还没建），跳过不报错
+                print(f"Backup warning: table {t} not found or error. {table_err}")
+                data[t] = []
+
         json_str = json.dumps(data, default=str, indent=2, ensure_ascii=False)
+
+        # 生成文件名
+        filename = f"voice_share_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
         # 返回文件下载流
         return Response(
             json_str,
             mimetype="application/json",
-            headers={
-                "Content-disposition": f"attachment; filename=voice_share_backup_{datetime.now().strftime('%Y%m%d%H%M')}.json"}
+            headers={"Content-disposition": f"attachment; filename={filename}"}
         )
     except Exception as e:
         flash(f"备份生成失败: {str(e)}", "error")
         return redirect(url_for("admin.db_backup"))
 
 
-# --- [模块：灾备] 5. 数据库恢复 ---
+# --- [模块：灾备] 5. 数据库恢复 (危险操作) ---
 @admin_bp.route("/backup/restore", methods=["POST"])
 @login_required
 def restore_db():
     _admin_required()
-    file = request.files.get('sql_file')
+
+    # 获取上传的文件
+    file = request.files.get('file')
     if not file:
-        flash("请选择备份文件", "error")
-        return redirect(url_for("admin.db_backup"))
+        return jsonify({'status': 'error', 'message': '未检测到上传文件'}), 400
 
     try:
+        # 1. 解析 JSON
         data = json.load(file)
-        # 这里仅做演示，真实恢复需要复杂的依赖处理
-        # 简单演示：打印日志并提示
-        user_count = len(data.get('users', []))
-        flash(f"模拟恢复成功！解析到 {user_count} 个用户数据。完整恢复需覆盖写入数据库。", "success")
-    except Exception as e:
-        flash(f"备份文件解析失败: {str(e)}", "error")
 
-    return redirect(url_for("admin.db_backup"))
+        # 简单格式校验
+        if 'meta' not in data or 'user' not in data:
+            return jsonify({'status': 'error', 'message': '无效的备份文件格式，缺少关键元数据'}), 400
+
+        # 2. 准备恢复列表 (注意顺序：删除时先子后父，插入时先父后子)
+        # 这里我们依靠关闭外键检查来简化顺序问题
+        tables = [
+            'room_participation_record', 'listen_record', 'room_message',
+            'room_playlist', 'room_member', 'system_audit_log',
+            'room', 'musics', 'user'
+        ]
+
+        # --- 开始事务 ---
+        # 3. 关闭外键约束检查 (关键步骤，否则无法清空有外键关联的表)
+        db.session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+
+        # 4. 清空旧数据 (TRUNCATE 会重置自增 ID，DELETE 不会。为了完全恢复，推荐 TRUNCATE)
+        for t in tables:
+            try:
+                db.session.execute(text(f"TRUNCATE TABLE {t}"))
+            except Exception:
+                # 如果 TRUNCATE 失败 (某些 MySQL 版本限制)，尝试 DELETE
+                db.session.execute(text(f"DELETE FROM {t}"))
+
+        # 5. 插入新数据
+        for t in tables:
+            # 倒序之后的 tables 列表其实是删除顺序，我们恢复时可以直接用 data 里的键
+            # 或者重新定义一个插入顺序。这里直接遍历 json 中的 keys 也可以，因为外键已关。
+            if t not in data: continue
+
+            rows = data[t]
+            if not rows: continue
+
+            # 构建 INSERT 语句: INSERT INTO table (col1, col2) VALUES (:col1, :col2)
+            # 假设每一行的 keys 都是一样的，取第一行做模板
+            keys = rows[0].keys()
+            columns_str = ', '.join(keys)
+            values_str = ', '.join([f':{k}' for k in keys])
+
+            sql = text(f"INSERT INTO {t} ({columns_str}) VALUES ({values_str})")
+
+            # 批量执行插入
+            db.session.execute(sql, rows)
+
+        # 6. 恢复外键约束检查
+        db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+
+        db.session.commit()
+
+        user_count = len(data.get('user', []))
+        return jsonify({
+            'status': 'success',
+            'message': f'数据恢复成功！\n快照时间: {data["meta"]["backup_time"]}\n恢复用户数: {user_count}'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        # 发生异常也要尝试把外键检查开回来，防止影响后续操作
+        try:
+            db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+            db.session.commit()
+        except:
+            pass
+
+        return jsonify({'status': 'error', 'message': f'恢复失败: {str(e)}'}), 500
 
 
 # ==============================================================================

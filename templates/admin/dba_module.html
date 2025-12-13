@@ -16,50 +16,168 @@
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 2.5rem;">
 
   {% if active_page == 'health' %}
-    {% if indexes %}
+
+    {# --- 模式 A: 详情模式 (显示特定表的索引和外键) --- #}
+    {% if detail_mode %}
       <div class="dashboard-card" style="grid-column: 1 / -1;">
-        <h3 style="margin-top:0; color:#1e293b; display: flex; align-items: center; gap: 0.5rem;"><i class="ri-file-list-3-line" style="color:#6366f1;"></i> 索引详情报告</h3>
-        {% for table_name, rows in indexes.items() %}
-          <div style="margin-top: 2rem;">
-            <h4 style="margin: 0 0 1rem 0; color: #6366f1; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:0.5rem; display:inline-block;">Table: {{ table_name }}</h4>
-            <div class="table-scroll">
-              <table class="data-table">
-                <thead><tr><th>Key Name</th><th>Column</th><th>Unique</th><th>Type</th></tr></thead>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;">
+            <h3 style="margin: 0; color: #1e293b; display: flex; align-items: center; gap: 0.8rem;">
+                <span style="background: #e0e7ff; color: #4338ca; padding: 4px 10px; border-radius: 8px; font-size: 0.9em;">Table</span>
+                {{ table_name }}
+            </h3>
+            <a href="{{ url_for('admin.db_health') }}" class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; color: #64748b; padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none;">
+                <i class="ri-arrow-left-line"></i> 返回概览
+            </a>
+        </div>
+
+        <h4 style="color: #6366f1; margin: 1.5rem 0 1rem;"><i class="ri-list-check"></i> 索引定义 (Indexes)</h4>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Key Name</th>
+                    <th>Seq</th>
+                    <th>Column</th>
+                    <th>Unique</th>
+                    <th>Type</th>
+                    <th>Cardinality</th>
+                </tr>
+            </thead>
+            <tbody>
+              {% for row in indexes %}
+              <tr>
+                  <td style="font-weight: 600; color: #334155;">{{ row.Key_name }}</td>
+                  <td>{{ row.Seq_in_index }}</td>
+                  <td style="color: #0f766e; background: #f0fdfa; border-radius: 4px; padding: 2px 6px;">{{ row.Column_name }}</td>
+                  <td>
+                      {% if row.Non_unique == 0 %}
+                        <span style="color: #15803d; background: #dcfce7; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem;">YES</span>
+                      {% else %}
+                        <span style="color: #94a3b8;">NO</span>
+                      {% endif %}
+                  </td>
+                  <td>{{ row.Index_type }}</td>
+                  <td>{{ row.Cardinality }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <h4 style="color: #f59e0b; margin: 2.5rem 0 1rem;"><i class="ri-link"></i> 外键约束 (Foreign Keys)</h4>
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead><tr><th>Constraint Name</th><th>Column</th><th>Ref Table</th><th>Ref Column</th></tr></thead>
                 <tbody>
-                  {% for row in rows %}
-                  <tr><td>{{ row.Key_name }}</td><td>{{ row.Column_name }}</td><td>{{ 'Yes' if row.Non_unique == 0 else 'No' }}</td><td>{{ row.Index_type }}</td></tr>
-                  {% endfor %}
+                    {% for fk in fks %}
+                    <tr>
+                        <td>{{ fk.CONSTRAINT_NAME }}</td>
+                        <td>{{ fk.COLUMN_NAME }}</td>
+                        <td style="color: #3b82f6;">{{ fk.REFERENCED_TABLE_NAME }}</td>
+                        <td>{{ fk.REFERENCED_COLUMN_NAME }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" style="text-align: center; color: #cbd5e1; padding: 1rem;">无外键约束</td></tr>
+                    {% endfor %}
                 </tbody>
-              </table>
-            </div>
-          </div>
-        {% endfor %}
+            </table>
+        </div>
       </div>
+
+{# --- 模式 B: 概览模式 (卡片网格) --- #}
     {% else %}
-      <div class="dashboard-card">
-        <div class="card-content">
-          <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-heart-pulse-line" style="color: #ef4444; margin-right: 8px;"></i> 索引健康度</h3>
-          <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">全盘扫描核心表 (User, Music, Room)，分析索引命中率、碎片情况及主键完整性，确保数据库高性能运行。</p>
-          <div style="margin-top: auto;">
-              <a href="{{ url_for('admin.db_health') }}" class="modern-action-btn" style="background: linear-gradient(135deg, #ef4444, #f87171); color: #fff; padding: 1rem; text-align: center; display: block; text-decoration: none; border-radius: 12px; font-size: 1rem;">
-                <i class="ri-pulse-line"></i> 开始体检
-              </a>
-          </div>
+      <div class="dashboard-card" style="grid-column: 1 / -1; background: transparent !important; box-shadow: none !important; border: none !important; padding: 0 !important;">
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
+            {% for t in tables %}
+            <a href="{{ url_for('admin.db_health', table=t.TABLE_NAME) }}" class="db-table-card" style="text-decoration: none; color: inherit;">
+                <div style="background: #fff; border-radius: 16px; padding: 1.5rem; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.3s ease; position: relative; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
+
+                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: {{ 'linear-gradient(90deg, #d8b4fe, #c084fc)' if t.TABLE_TYPE == 'VIEW' else 'linear-gradient(90deg, #6366f1, #a855f7)' }};"></div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
+                            <h3 style="margin: 0; font-size: 1.15rem; color: #1e293b; font-weight: 700; word-break: break-all;">
+                                {{ t.TABLE_NAME }}
+                            </h3>
+                            {% if t.TABLE_TYPE == 'VIEW' %}
+                                <span style="font-size: 0.65rem; background: #f3e8ff; color: #9333ea; padding: 2px 6px; border-radius: 4px; font-weight: 700; border: 1px solid #e9d5ff; flex-shrink: 0;">VIEW</span>
+                            {% else %}
+                                <span style="font-size: 0.65rem; background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; font-weight: 600; border: 1px solid #e2e8f0; flex-shrink: 0;">TABLE</span>
+                            {% endif %}
+                        </div>
+
+                        <p style="margin: 0; font-size: 0.85rem; color: #64748b; line-height: 1.5;">
+                            {{ table_desc.get(t.TABLE_NAME, '系统数据对象') }}
+                        </p>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div style="background: #f0fdfa; padding: 0.8rem; border-radius: 10px; text-align: center;">
+                            <div style="font-size: 0.75rem; color: #0f766e; margin-bottom: 4px;">实体完整性 (PK)</div>
+                            {% if t.pk_count > 0 %}
+                                <div style="color: #10b981; font-weight: 800; font-size: 1.1rem;"><i class="ri-check-double-line"></i> 正常</div>
+                            {% elif t.TABLE_TYPE == 'VIEW' %}
+                                <div style="color: #94a3b8; font-weight: 600; font-size: 1.1rem;">N/A</div>
+                            {% else %}
+                                <div style="color: #ef4444; font-weight: 800; font-size: 1.1rem;"><i class="ri-alert-line"></i> 缺失</div>
+                            {% endif %}
+                        </div>
+
+                        <div style="background: #fff7ed; padding: 0.8rem; border-radius: 10px; text-align: center;">
+                            <div style="font-size: 0.75rem; color: #9a3412; margin-bottom: 4px;">参照完整性 (FK)</div>
+                            {% if t.TABLE_TYPE == 'VIEW' %}
+                                <div style="color: #94a3b8; font-weight: 600; font-size: 1.1rem;">N/A</div>
+                            {% else %}
+                                <div style="color: #f97316; font-weight: 800; font-size: 1.2rem;">{{ t.fk_count }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed #e2e8f0; padding-top: 1rem;">
+
+                        <div style="display: flex; align-items: center; gap: 6px;" title="索引数量">
+                            <i class="ri-key-2-line" style="color: #6366f1;"></i>
+                            <span style="font-size: 0.9rem; color: #475569; font-weight: 600;">{{ t.index_count }} 索引</span>
+                        </div>
+
+                        {% if t.TABLE_TYPE == 'BASE TABLE' %}
+                            <div style="display: flex; align-items: center; gap: 6px;" title="当前数据行数">
+                                <i class="ri-list-check-2" style="color: #94a3b8; font-size: 0.9rem;"></i>
+                                <span style="background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; font-family: monospace; font-weight: 600;">
+                                    {{ t.TABLE_ROWS if t.TABLE_ROWS is not none else '0' }} rows
+                                </span>
+                            </div>
+                        {% else %}
+                            <div style="color: #cbd5e1; font-size: 1.1rem;" title="视图 (虚拟表)">
+                                <i class="ri-eye-line"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div style="margin-top: 1rem; text-align: center; color: #3b82f6; font-size: 0.9rem; font-weight: 600; opacity: 0; transform: translateY(10px); transition: all 0.3s;" class="hover-tip">
+                        点击查看详情 <i class="ri-arrow-right-line"></i>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
         </div>
-      </div>
-      <div class="dashboard-card">
-        <div class="card-content">
-          <h3 style="margin-top: 0; color: #1e293b;"><i class="ri-delete-bin-2-line" style="color: #64748b; margin-right: 8px;"></i> 孤儿数据清理</h3>
-          <p style="color: #64748b; line-height: 1.6; margin-bottom: 2rem;">扫描无效的 MP3 文件引用、无主的房间记录以及断裂的外键关联，释放存储空间。</p>
-          <div style="margin-top: auto;">
-              <button class="modern-action-btn" style="background: #fff; border: 1px solid #cbd5e1; color: #475569; padding: 1rem; width: 100%; border-radius: 12px; font-size: 1rem;">
-                <i class="ri-recycle-line"></i> 扫描垃圾数据
-              </button>
-          </div>
-        </div>
+
+        <style>
+            .db-table-card:hover > div {
+                transform: translateY(-5px);
+                box-shadow: 0 15px 30px rgba(99, 102, 241, 0.15) !important;
+                border-color: #a78bfa !important;
+            }
+            .db-table-card:hover .hover-tip {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        </style>
       </div>
     {% endif %}
 
+  {# 其他页面逻辑保持不变 #}
   {% elif active_page == 'automation' %}
     <div class="dashboard-card">
       <div class="card-content">

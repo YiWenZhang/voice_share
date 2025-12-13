@@ -36,24 +36,110 @@ def dashboard():
 @admin_bp.route("/db-health")
 @login_required
 def db_health():
-    """索引与健康页面"""
+    """索引与健康页面 (升级版：概览 + 详情)"""
     _admin_required()
-    # 获取索引信息，供页面显示
-    tables = ['user', 'room', 'musics']
-    indexes = {}
-    try:
-        for t in tables:
-            # 使用 mappings() 获取字典格式结果
-            indexes[t] = db.session.execute(text(f"SHOW INDEX FROM {t}")).mappings().all()
-    except Exception as e:
-        flash(f"获取索引信息失败: {str(e)}", "error")
 
-    return render_template("admin/dba_module.html",
-                           active_page='health',
-                           title="索引与完整性监控",
-                           subtitle="数据库核心表索引状态与外键约束检查",
-                           icon="ri-pulse-line",
-                           indexes=indexes)
+    target_table = request.args.get('table')
+
+    # --- 模式 A: 单表详情模式 (当 URL 包含 ?table=xxx 时触发) ---
+    if target_table:
+        # 简单防注入验证
+        if not target_table.isidentifier():
+            flash("非法表名", "error")
+            return redirect(url_for('admin.db_health'))
+
+        try:
+            # 1. 获取索引详情
+            indexes = db.session.execute(text(f"SHOW INDEX FROM {target_table}")).mappings().all()
+
+            # 2. 获取外键详情 (额外查询 KEY_COLUMN_USAGE 表)
+            fk_sql = text("""
+                SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+                FROM information_schema.KEY_COLUMN_USAGE
+                WHERE TABLE_SCHEMA = DATABASE() 
+                  AND TABLE_NAME = :t 
+                  AND REFERENCED_TABLE_NAME IS NOT NULL
+            """)
+            fks = db.session.execute(fk_sql, {"t": target_table}).mappings().all()
+
+            return render_template("admin/dba_module.html",
+                                   active_page='health',
+                                   detail_mode=True,
+                                   table_name=target_table,
+                                   indexes=indexes,
+                                   fks=fks,
+                                   title=f"表详情: {target_table}",
+                                   subtitle="索引结构与完整性约束明细",
+                                   icon="ri-table-line")
+        except Exception as e:
+            flash(f"获取表详情失败: {str(e)}", "error")
+            return redirect(url_for('admin.db_health'))
+
+    # --- 模式 B: 全库概览模式 (默认显示) ---
+    else:
+        try:
+            # [新增] 表功能描述字典 (含视图)
+            table_desc = {
+                'user': '存储用户账号、密码、昵称及头像路径',
+                'room': '存储房间信息、在线状态及播放进度',
+                'musics': '存储音乐元数据、文件路径及审核状态',
+                'room_member': '记录当前房间内的在线成员关联',
+                'room_message': '存储所有房间的历史聊天弹幕',
+                'listen_record': '记录用户的听歌历史流水',
+                'room_participation_record': '记录用户的房间访问足迹',
+                'room_playlist': '存储各房间当前的排队播放列表',
+                # 视图描述
+                'v_music_full_info': '聚合查询：音乐+用户信息的完整视图',
+                'v_room_stats': '统计视图：计算房间实时热度和在线人数'
+            }
+
+            # [修复] 修正后的 SQL 查询 (增加了 TABLE_TYPE)
+            sql = """
+            SELECT 
+                T.TABLE_NAME,
+                T.TABLE_TYPE,  -- [新增] 关键字段：区分 BASE TABLE 或 VIEW
+                T.TABLE_ROWS,
+                T.DATA_LENGTH,
+                -- 统计索引个数 (去重索引名)
+                (SELECT COUNT(DISTINCT INDEX_NAME) 
+                 FROM information_schema.STATISTICS S 
+                 WHERE S.TABLE_NAME = T.TABLE_NAME 
+                   AND S.TABLE_SCHEMA = DATABASE()) as index_count,
+                -- 统计主键个数 (实体完整性)
+                (SELECT COUNT(*) 
+                 FROM information_schema.TABLE_CONSTRAINTS C 
+                 WHERE C.TABLE_NAME = T.TABLE_NAME 
+                   AND C.TABLE_SCHEMA = DATABASE() 
+                   AND C.CONSTRAINT_TYPE = 'PRIMARY KEY') as pk_count,
+                -- 统计外键个数 (参照完整性)
+                (SELECT COUNT(*) 
+                 FROM information_schema.TABLE_CONSTRAINTS C 
+                 WHERE C.TABLE_NAME = T.TABLE_NAME 
+                   AND C.TABLE_SCHEMA = DATABASE() 
+                   AND C.CONSTRAINT_TYPE = 'FOREIGN KEY') as fk_count
+            FROM information_schema.TABLES T
+            WHERE T.TABLE_SCHEMA = DATABASE();
+            """
+
+            tables_stats = db.session.execute(text(sql)).mappings().all()
+
+            return render_template("admin/dba_module.html",
+                                   active_page='health',
+                                   detail_mode=False,
+                                   tables=tables_stats,
+                                   table_desc=table_desc,  # 传递描述字典
+                                   title="数据库健康全景",
+                                   subtitle="核心表索引、实体完整性与参照完整性概览",
+                                   icon="ri-heart-pulse-line")
+        except Exception as e:
+            flash(f"获取概览失败: {str(e)}", "error")
+            # 出错时返回空列表，避免页面崩溃
+            return render_template("admin/dba_module.html",
+                                   active_page='health',
+                                   tables=[],
+                                   title="Error",
+                                   subtitle="Connection Failed",
+                                   icon="ri-error-warning-line")
 
 
 @admin_bp.route("/db-automation")

@@ -323,6 +323,7 @@ def room_detail(code):
         my_library=my_approved_music,
         messages=messages,
         member_count=member_count,
+        timedelta=timedelta,  # [新增] 把 timedelta 工具传给前端
     )
 
 
@@ -503,7 +504,7 @@ def room_state(code):
         "author_id": m.author.id,
         "author_name": m.author.nickname or m.author.username,
         "author_avatar": m.author.avatar_url,
-        "created_at": m.created_at.strftime('%H:%M'),
+        "created_at": (m.created_at + timedelta(hours=8)).strftime('%H:%M'),
         "content": m.content
     } for m in recent_msgs]
 

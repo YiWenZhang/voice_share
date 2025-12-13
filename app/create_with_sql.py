@@ -258,9 +258,18 @@ def init_db_with_raw_sql(db):
 
     # ... (上面的 sql_statements 列表定义保持不变) ...
 
+    # ... (前面的 sql_statements 列表定义保持不变)
+
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+
     try:
-        # 执行所有建表语句
-        with db.engine.connect() as connection:
+        # [核心修改] 显式获取 'admin_db' (即 vs_admin) 的引擎来执行建表
+        # 注意：这里 bind='admin_db' 必须与 config.py 中 SQLALCHEMY_BINDS 的键名一致
+        admin_engine = db.get_engine(bind='admin_db')
+
+        # 使用管理员引擎建立连接
+        with admin_engine.connect() as connection:
             for sql in sql_statements:
                 try:
                     connection.execute(text(sql))
@@ -279,3 +288,4 @@ def init_db_with_raw_sql(db):
         print("数据库表、索引及自动化脚本校验完成 (Success)。")
     except Exception as e:
         print(f"初始化过程发生未处理错误: {e}")
+        print("建议检查: 1. config.py 是否配置了 SQLALCHEMY_BINDS; 2. .env 中 DATABASE_URL_ADMIN 是否正确。")

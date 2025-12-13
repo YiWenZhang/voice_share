@@ -1,11 +1,11 @@
-## 共享听歌房系统 (Voice Share)
+# 共享听歌房系统 (Voice Share)
 
 基于 Flask + MySQL 的一体化网页系统，覆盖注册登录、音乐上传、房间共享听歌、房间互动、行为记录、管理员审核等完整流程。普通用户 5 分钟内即可完成 “注册登录 → 创建房间 → 上传音乐 → 播放音乐 → 发送评论” 核心闭环，管理员拥有独立审核后台。
 
 目前旧版本（SQLite）已经部署服务器，欢迎大家查看整体功能！
 网址：http://115.190.207.9
 
-### 功能概览
+## 功能概览
 
 - **注册登录**：普通用户需通过滑块拼图验证；连续输错密码 2 次会锁定 1 分钟。管理员账号需以 `admin_` 为前缀，并输入特定密钥进行注册，拥有独立后台入口。
 - **个人信息**：用户可修改昵称（≤10 字）与本地头像（≤5MB 图片），即时生效。
@@ -18,44 +18,101 @@
 - **行为数据**：自动保存最近 30 天的听歌记录（歌曲名 + 播放时间）与房间参与记录（房间号 + 时间），仅本人可见，**支持手动删除单条记录**。
 - **管理员审核**：后台展示“待审核”与“违规”列表；提供“通过 / 驳回”操作，驳回时可填写理由，系统自动通知用户。
 
-### 运行方式
+## 运行方式
 
-1. **环境准备**
-   - 确保本地已安装 MySQL 8.0+。
-   - 登录 MySQL 并创建数据库：
-     ```sql
-     CREATE DATABASE voice_share CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-     ```
+### 1.**数据库环境准备 (DAC 权限配置)**
 
-2. **安装依赖**
-   ```bash
-   pip install -r requirements.txt
+为了实现**自主存取控制 (Discretionary Access Control)**，本系统严禁使用 `root` 账号直接运行。请登录 MySQL 执行以下 SQL 脚本，创建权限分离的专用账户：
+
+#### 1.1 **创建数据库**
+```sql
+    DROP DATABASE IF EXISTS voice_share;
+    CREATE DATABASE voice_share CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    -- 可选项：解决 MySQL 8.0+ 触发器报错 (Error 1419)
+    -- 允许非 SUPER 用户创建触发器，这对后续 Python 脚本自动创建触发器至关重要
+    SET GLOBAL log_bin_trust_function_creators = 1;
+```
+
+#### 1.2 **创建角色**
+以root权限进入你的数据库，并运行以下SQL语句，创建两个角色 (如果已存在则重建，确保环境纯净)
+```sql
+    DROP USER IF EXISTS 'vs_admin'@'localhost';
+    DROP USER IF EXISTS 'vs_normal'@'localhost';
+    
+    CREATE USER 'vs_admin'@'localhost' IDENTIFIED BY 'AdminPass123!';
+    CREATE USER 'vs_normal'@'localhost' IDENTIFIED BY 'UserPass123!';
+    
+    -- 授予管理员“施工”权限
+    -- vs_admin 需要有权在 voice_share 库里建表、建存储过程、清空数据
+    GRANT ALL PRIVILEGES ON voice_share.* TO 'vs_admin'@'localhost';
+    
+    -- 刷新权限
+    FLUSH PRIVILEGES;
+```
 
 
-3.  **配置环境变量**
+### 2.**安装依赖**
+```bash
+pip install -r requirements.txt
+```
 
-      - 项目根目录下已包含 `.env` 文件（或复制 `.env.example`），请根据本地数据库配置修改 `DATABASE_URL`：
-        ```ini
-        # 格式: mysql+pymysql://用户名:密码@地址:端口/数据库名
-        DATABASE_URL=mysql+pymysql://root:123456@localhost:3306/voice_share
-        SECRET_KEY=your_secret_key
-        ```
 
-4.  **初始化与启动**
+### 3.**配置环境变量**
 
-      - 系统会在第一次启动时通过 `app/create_with_sql.py` 自动尝试创建数据表。
-      - 启动应用：
-        ```bash
+项目根目录下已包含 .env 文件，请填入上述创建的两个账号：
+```Ini, TOML
+
+# 普通业务连接 (vs_normal)
+DATABASE_URL=mysql+pymysql://vs_normal:UserPass123!@localhost:3306/voice_share
+
+# 管理员连接 (vs_admin) - 用于审计与灾备
+DATABASE_URL_ADMIN=mysql+pymysql://vs_admin:AdminPass123
+```
+
+### 4.**初始化与启动**
+
+- 系统会在第一次启动时通过 `app/create_with_sql.py` 自动尝试创建数据表。
+- 启动应用：
+```bash
         python run.py
-        ```
-      - *可选：运行 `python app/test_raw_sql.py` 可测试数据库连接及表结构状态。*
+```
 
-5.  **访问地址**
+### 5.**最终授权（MySQL 端）**
+登录你的数据库，用root权限完成建表后的最终授权：
+```sql
+    USE voice_share;
+    
+    -- 1. 授予业务表的增删改查权限
+    GRANT SELECT, INSERT, UPDATE, DELETE ON voice_share.musics TO 'vs_normal'@'localhost';
+    GRANT SELECT, INSERT, UPDATE, DELETE ON voice_share.room TO 'vs_normal'@'localhost';
+    GRANT SELECT, INSERT, UPDATE, DELETE ON voice_share.room_playlist TO 'vs_normal'@'localhost';
+    GRANT SELECT, INSERT, UPDATE, DELETE ON voice_share.room_member TO 'vs_normal'@'localhost';
+    GRANT SELECT, INSERT, UPDATE, DELETE ON voice_share.room_message TO 'vs_normal'@'localhost';
+    GRANT SELECT, INSERT, UPDATE, DELETE ON voice_share.listen_record TO 'vs_normal'@'localhost';
+    GRANT SELECT, INSERT, UPDATE, DELETE ON voice_share.room_participation_record TO 'vs_normal'@'localhost';
+    
+    -- 2. [安全控制] 用户表只给 增/改/查，严禁 DELETE
+    GRANT SELECT, INSERT, UPDATE ON voice_share.user TO 'vs_normal'@'localhost';
+    
+    -- 3. 视图权限
+    GRANT SELECT ON voice_share.v_music_full_info TO 'vs_normal'@'localhost';
+    GRANT SELECT ON voice_share.v_room_stats TO 'vs_normal'@'localhost';
+    
+    -- 4. 再次刷新
+    FLUSH PRIVILEGES;
+```
 
-      - 用户前台：http://localhost:5000
-      - 管理员后台：http://localhost:5000/admin/login
 
-### 目录结构
+### 6.**运行访问**
+此时全部授权已经完成，再次执行
+```bash
+        python run.py
+```
+访问端口如下
+- 用户前台：http://localhost:5000
+- 管理员后台：http://localhost:5000/admin/login
+
+## 目录结构
 
 ```text
 voice_share/
@@ -92,7 +149,7 @@ voice_share/
 └── run.py                      # 项目启动入口
 ```
 
-### 关键设计
+## 关键设计
 
   - **安全性**
       - 使用 Flask-WTF CSRF 防护。

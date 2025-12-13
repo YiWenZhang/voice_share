@@ -7,9 +7,18 @@ class Config:
 
     BASE_DIR = Path(__file__).resolve().parent
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", f"sqlite:///{BASE_DIR / 'app.db'}"
-    )
+    # SQLALCHEMY_DATABASE_URI = os.environ.get(
+    #     "DATABASE_URL", f"sqlite:///{BASE_DIR / 'app.db'}"
+    # )
+    # ————————自主存取控制实现——————————————
+    # 读取普通用户连接
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
+
+    # 读取管理员连接，并绑定到 'admin_db'
+    SQLALCHEMY_BINDS = {
+        "admin_db": os.environ.get("DATABASE_URL_ADMIN")
+    }
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     MAX_CONTENT_LENGTH = 60 * 1024 * 1024  # 60 MB upper bound for uploads
     UPLOAD_FOLDER = BASE_DIR / "static" / "uploads"

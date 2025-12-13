@@ -36,7 +36,6 @@ class User(UserMixin, TimestampMixin, db.Model):
             return f"/static/uploads/avatars/{Path(self.avatar_path).name}"
         return "https://placehold.co/80x80?text=VS"
 
-
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))

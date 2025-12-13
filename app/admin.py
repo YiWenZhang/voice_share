@@ -7,6 +7,8 @@ import json
 import io
 from datetime import datetime
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for, Response, send_file, jsonify
+from sqlalchemy import text
+
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -211,22 +213,39 @@ def exec_maintenance():
 @admin_bp.route("/audit-logs")
 @login_required
 def audit_logs():
-    _admin_required()
-    # 查询审计表
-    try:
-        logs = db.session.execute(
-            text("SELECT * FROM system_audit_log ORDER BY action_time DESC LIMIT 50")).mappings().all()
-    except Exception as e:
-        logs = []
-        flash("审计表查询失败，请检查表是否存在", "warning")
+    _admin_required()  # 确保是管理员登录
 
-    # 复用 dba_module 模板，但激活 'audit_logs_view' 状态来显示表格
+    logs = []
+    try:
+        # [核心修改 1] 显式获取“管理员专用”的数据库引擎
+        # 这一步明确指定了使用 config.py 中 'admin_db' (vs_admin) 的连接
+        admin_engine = db.get_engine(bind='admin_db')
+
+        # [核心修改 2] 建立原生连接，不经过 Session/Model
+        with admin_engine.connect() as conn:
+            # [核心修改 3] 编写纯 SQL 语句 (Teacher's Requirement)
+            # 注意：普通用户连接执行这句会报错，因为没有权限
+            sql = text("SELECT * FROM system_audit_log ORDER BY action_time DESC LIMIT 50")
+
+            # 执行查询
+            result = conn.execute(sql)
+
+            # 将结果转换为字典列表 (mappings() 方法适配 Jinja2 模板渲染)
+            logs = result.mappings().all()
+
+    except Exception as e:
+        # 如果这里报错，很可能是权限不足（比如配错成了 vs_normal）
+        flash(f"权限拒绝或查询错误: {str(e)}", "error")
+        logs = []
+
+    # 渲染模板 (模板代码不需要改，因为它只负责显示列表)
     return render_template("admin/dba_module.html",
                            active_page='audit_logs_view',
                            title="审计日志明细",
-                           subtitle="最近 50 条敏感操作记录 (Trigger Generated)",
+                           subtitle="管理员特权视图 (Raw SQL Access)",
                            icon="ri-file-list-3-line",
                            logs=logs)
+
 
 
 # --- [模块：安全] 3. 事务级用户封禁 (Transaction) ---
@@ -327,81 +346,86 @@ def backup_db():
 @admin_bp.route("/backup/restore", methods=["POST"])
 @login_required
 def restore_db():
-    _admin_required()
+    _admin_required()  # 确保只有管理员能进
 
-    # 获取上传的文件
+    # 1. 获取上传的文件
     file = request.files.get('file')
     if not file:
         return jsonify({'status': 'error', 'message': '未检测到上传文件'}), 400
 
     try:
-        # 1. 解析 JSON
+        # 2. 解析 JSON 数据
         data = json.load(file)
 
-        # 简单格式校验
+        # 简单校验
         if 'meta' not in data or 'user' not in data:
-            return jsonify({'status': 'error', 'message': '无效的备份文件格式，缺少关键元数据'}), 400
+            return jsonify({'status': 'error', 'message': '无效的备份文件格式'}), 400
 
-        # 2. 准备恢复列表 (注意顺序：删除时先子后父，插入时先父后子)
-        # 这里我们依靠关闭外键检查来简化顺序问题
+        # 3. 定义恢复顺序 (与备份时一致即可，因为我们会关闭外键检查)
         tables = [
             'room_participation_record', 'listen_record', 'room_message',
             'room_playlist', 'room_member', 'system_audit_log',
             'room', 'musics', 'user'
         ]
 
-        # --- 开始事务 ---
-        # 3. 关闭外键约束检查 (关键步骤，否则无法清空有外键关联的表)
-        db.session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+        # --- [核心修改] 自主存取控制体现 ---
+        # 显式获取 'admin_db' (vs_admin) 的连接引擎
+        # 如果用默认的 db.session，就是用 vs_normal，它是没有 TRUNCATE 权限的
+        admin_engine = db.get_engine(bind='admin_db')
 
-        # 4. 清空旧数据 (TRUNCATE 会重置自增 ID，DELETE 不会。为了完全恢复，推荐 TRUNCATE)
-        for t in tables:
+        # --- [核心修改] 原生 SQL 操作 ---
+        with admin_engine.connect() as conn:
+            # 开启事务 (ACID 特性)
+            trans = conn.begin()
             try:
-                db.session.execute(text(f"TRUNCATE TABLE {t}"))
-            except Exception:
-                # 如果 TRUNCATE 失败 (某些 MySQL 版本限制)，尝试 DELETE
-                db.session.execute(text(f"DELETE FROM {t}"))
+                # A. 关闭外键约束检查 (否则无法随意清空表)
+                conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
 
-        # 5. 插入新数据
-        for t in tables:
-            # 倒序之后的 tables 列表其实是删除顺序，我们恢复时可以直接用 data 里的键
-            # 或者重新定义一个插入顺序。这里直接遍历 json 中的 keys 也可以，因为外键已关。
-            if t not in data: continue
+                # B. 清空旧数据 (使用 TRUNCATE，比 DELETE 更彻底，需要高权限)
+                for t in tables:
+                    # 使用原生 SQL 执行
+                    conn.execute(text(f"TRUNCATE TABLE {t}"))
 
-            rows = data[t]
-            if not rows: continue
+                # C. 插入新数据
+                for t in tables:
+                    rows = data.get(t, [])
+                    if not rows:
+                        continue
 
-            # 构建 INSERT 语句: INSERT INTO table (col1, col2) VALUES (:col1, :col2)
-            # 假设每一行的 keys 都是一样的，取第一行做模板
-            keys = rows[0].keys()
-            columns_str = ', '.join(keys)
-            values_str = ', '.join([f':{k}' for k in keys])
+                    # 动态构建原生 INSERT 语句
+                    # 假设 rows[0] 是 {'id': 1, 'username': 'admin'...}
+                    # 我们需要生成: INSERT INTO user (id, username) VALUES (:id, :username)
+                    keys = rows[0].keys()
+                    columns = ', '.join(keys)
+                    placeholders = ', '.join([f':{k}' for k in keys])
 
-            sql = text(f"INSERT INTO {t} ({columns_str}) VALUES ({values_str})")
+                    sql = text(f"INSERT INTO {t} ({columns}) VALUES ({placeholders})")
 
-            # 批量执行插入
-            db.session.execute(sql, rows)
+                    # SQLAlchemy 的 execute 支持传入列表，自动进行批量插入
+                    conn.execute(sql, rows)
 
-        # 6. 恢复外键约束检查
-        db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+                # D. 恢复外键约束检查
+                conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
 
-        db.session.commit()
+                # E. 提交事务
+                trans.commit()
 
-        user_count = len(data.get('user', []))
+            except Exception as db_err:
+                # 发生错误回滚事务
+                trans.rollback()
+                # 尝试恢复外键检查（防止连接池复用时影响后续）
+                try:
+                    conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+                except:
+                    pass
+                raise db_err
+
         return jsonify({
             'status': 'success',
-            'message': f'数据恢复成功！\n快照时间: {data["meta"]["backup_time"]}\n恢复用户数: {user_count}'
+            'message': f'数据恢复成功！\n快照时间: {data["meta"]["backup_time"]}'
         })
 
     except Exception as e:
-        db.session.rollback()
-        # 发生异常也要尝试把外键检查开回来，防止影响后续操作
-        try:
-            db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-            db.session.commit()
-        except:
-            pass
-
         return jsonify({'status': 'error', 'message': f'恢复失败: {str(e)}'}), 500
 
 

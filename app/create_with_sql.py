@@ -192,12 +192,30 @@ def init_db_with_raw_sql(db):
         CREATE INDEX idx_room_active ON room(is_active);
         """,
     ]
+
+
+    from sqlalchemy import text
+    # [新增] 导入 SQL 执行时的运行错误异常
+    from sqlalchemy.exc import OperationalError
+
+    # ... (上面的 sql_statements 列表定义保持不变) ...
+
     try:
         # 执行所有建表语句
         with db.engine.connect() as connection:
             for sql in sql_statements:
-                connection.execute(text(sql))
+                try:
+                    connection.execute(text(sql))
+                except OperationalError as e:
+                    # [修改] 捕获 MySQL 错误 1061 (Duplicate key name)
+                    # 如果是因为索引已存在导致的错误，则打印提示并继续，不中断程序
+                    if e.orig.args[0] == 1061:
+                        print(f"提示: 索引或键已存在，跳过创建 -> {e.orig.args[1]}")
+                    else:
+                        # 如果是其他错误 (如语法错误)，则正常抛出异常
+                        raise e
+
             connection.commit()
-        print("数据库表已通过原生 MySQL SQL 创建完成。")
+        print("数据库表及索引结构校验完成 (Success)。")
     except Exception as e:
-        print(f"创建表时发生错误: {e}")
+        print(f"初始化过程发生未处理错误: {e}")

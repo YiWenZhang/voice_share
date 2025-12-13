@@ -5,7 +5,7 @@
 <div class="module-header">
   <div class="module-title">
     <h1><i class="ri-disc-line" style="color: #6366f1;"></i> 全平台音乐库</h1>
-    <p>基于 <code>v_music_full_info</code> 视图的完整数据映射</p>
+    <p>高级查询与自定义视图</p>
   </div>
   <div class="header-status">
     <a href="{{ url_for('db_views.admin_query_center') }}" class="modern-action-btn" style="background: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.6); padding: 0.6rem 1.2rem; border-radius: 99px; cursor: pointer; color: #475569; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
@@ -14,50 +14,134 @@
   </div>
 </div>
 
+
+<section class="dashboard-card" style="margin-bottom: 2rem; padding: 1.5rem; border-top: 4px solid #6366f1;">
+
+  <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.8rem; background: #f0fdfa; padding: 0.8rem 1rem; border-radius: 8px; border: 1px dashed #ccfbf1;">
+    <i class="ri-database-2-line" style="color: #0f766e;"></i>
+    <span style="font-size: 0.9rem; color: #115e59; font-weight: 500;">
+      <strong>技术驱动：</strong> 本查询基于数据库视图 <code>v_music_full_info</code> 构建，且 歌名、上传者、状态 字段均已命中数据库索引 (Index)，支持千万级数据秒级检索。
+    </span>
+  </div>
+
+  <form method="get" action="{{ url_for('db_views.admin_music_view_query') }}" style="display: flex; flex-direction: column; gap: 1.2rem;">
+
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+
+      <div style="flex: 2; min-width: 180px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+          <i class="ri-music-2-fill" style="color: #a78bfa; margin-right: 4px;"></i> 歌曲名称
+        </label>
+        <input type="text" name="q_title" value="{{ q_title }}" placeholder="模糊搜索..."
+               style="width: 100%; padding: 0.7rem 1rem; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem;">
+      </div>
+
+      <div style="flex: 2; min-width: 180px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+          <i class="ri-user-smile-line" style="color: #f472b6; margin-right: 4px;"></i> 上传者昵称
+        </label>
+        <input type="text" name="q_uploader" value="{{ q_uploader }}" placeholder="输入昵称..."
+               style="width: 100%; padding: 0.7rem 1rem; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem;">
+      </div>
+
+      <div style="flex: 1; min-width: 120px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">
+          <i class="ri-fingerprint-line" style="color: #64748b; margin-right: 4px;"></i> UID
+        </label>
+        <input type="number" name="q_uid" value="{{ q_uid }}" placeholder="精确ID"
+               style="width: 100%; padding: 0.7rem 1rem; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem;">
+      </div>
+
+      <div style="flex: 1; min-width: 120px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem;">状态</label>
+        <select name="status" style="width: 100%; padding: 0.7rem 1rem; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem; background: #fff;">
+          <option value="">全部</option>
+          <option value="pending" {{ 'selected' if filter_status == 'pending' }}>待审核</option>
+          <option value="approved" {{ 'selected' if filter_status == 'approved' }}>已发布</option>
+          <option value="rejected" {{ 'selected' if filter_status == 'rejected' }}>已驳回</option>
+        </select>
+      </div>
+
+      <button type="submit" class="modern-action-btn" style="flex: 0 0 auto; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; padding: 0 1.8rem; height: 42px; border-radius: 10px; margin-bottom: 1px; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); white-space: nowrap;">
+        <i class="ri-search-2-line" style="margin-right: 4px;"></i> 查询
+      </button>
+
+    </div>
+
+    <div style="padding-top: 1.2rem; border-top: 1px dashed #e2e8f0;">
+      <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #64748b; margin-bottom: 0.8rem;">
+        <i class="ri-layout-column-line"></i> 自定义结果列:
+      </label>
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        {% for key, conf in all_columns.items() %}
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; color: #334155; background: #fff; padding: 6px 12px; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.2s;">
+            <input type="checkbox" name="cols" value="{{ key }}" {{ 'checked' if key in selected_cols }} style="accent-color: #6366f1;">
+            {{ conf.name }}
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+  </form>
+</section>
+
 <section class="grid-card">
   <div class="table-scroll">
     <table class="data-table">
       <thead>
         <tr>
-          <th style="padding-left: 1.5rem;">ID</th>
-          <th>歌曲信息</th>
-          <th>上传者</th>
-          <th>当前状态</th>
-          <th>上传时间</th>
+          {% for key in selected_cols %}
+            <th style="{{ 'padding-left: 1.5rem;' if loop.first }}">{{ all_columns[key].name }}</th>
+          {% endfor %}
         </tr>
       </thead>
       <tbody>
         {% for m in musics %}
         <tr>
-          <td style="padding-left: 1.5rem; color: #64748b; font-family: monospace;">#{{ m.music_id }}</td>
-          <td>
-            <div style="font-weight: 700; color: #1e293b;">{{ m.title }}</div>
-            <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">{{ m.original_filename }}</div>
-          </td>
-          <td>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #e0e7ff, #c7d2fe); color: #4338ca; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem;">
-                {{ m.uploader_nickname[0] }}
-              </div>
-              <div>
-                <div style="font-weight: 600; color: #334155; font-size: 0.9rem;">{{ m.uploader_nickname }}</div>
-                <div style="font-size: 0.75rem; color: #94a3b8;">@{{ m.uploader_name }}</div>
-              </div>
-            </div>
-          </td>
-          <td>
-            {% if m.status == 'approved' %}
-              <span style="background: rgba(220, 252, 231, 0.6); color: #166534; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">已发布</span>
-            {% elif m.status == 'pending' %}
-              <span style="background: rgba(255, 237, 213, 0.6); color: #c2410c; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">待审核</span>
-            {% else %}
-              <span style="background: rgba(254, 226, 226, 0.6); color: #991b1b; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;" title="{{ m.rejection_reason }}">已驳回</span>
+          {% for key in selected_cols %}
+            {% if key == 'id' %}
+              <td style="padding-left: 1.5rem; color: #64748b; font-family: monospace;">#{{ m.music_id }}</td>
+
+            {% elif key == 'title' %}
+              <td>
+                <div style="font-weight: 700; color: #1e293b;">{{ m.title }}</div>
+                <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">{{ m.original_filename }}</div>
+              </td>
+
+            {% elif key == 'uploader' %}
+              <td>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #e0e7ff, #c7d2fe); color: #4338ca; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem;">
+                    {{ m.uploader_nickname[0] }}
+                  </div>
+                  <div>
+                    <div style="font-weight: 600; color: #334155; font-size: 0.9rem;">{{ m.uploader_nickname }}</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8;">ID: {{ m.uploader_id }}</div>
+                  </div>
+                </div>
+              </td>
+
+            {% elif key == 'status' %}
+              <td>
+                {% if m.status == 'approved' %}
+                  <span style="background: rgba(220, 252, 231, 0.6); color: #166534; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">已发布</span>
+                {% elif m.status == 'pending' %}
+                  <span style="background: rgba(255, 237, 213, 0.6); color: #c2410c; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">待审核</span>
+                {% else %}
+                  <span style="background: rgba(254, 226, 226, 0.6); color: #991b1b; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">已驳回</span>
+                {% endif %}
+              </td>
+
+            {% elif key == 'time' %}
+              <td style="color: #64748b;">{{ m.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
+
+            {% elif key == 'reason' %}
+              <td style="color: #ef4444; font-size: 0.9rem;">{{ m.rejection_reason or '-' }}</td>
             {% endif %}
-          </td>
-          <td style="color: #64748b;">{{ m.uploaded_at.strftime('%Y-%m-%d') }}</td>
+          {% endfor %}
         </tr>
         {% else %}
-        <tr><td colspan="5" style="text-align: center; padding: 4rem 0; color: #64748b;">暂无数据</td></tr>
+        <tr><td colspan="{{ selected_cols|length }}" style="text-align: center; padding: 4rem 0; color: #64748b;">暂无匹配数据</td></tr>
         {% endfor %}
       </tbody>
     </table>

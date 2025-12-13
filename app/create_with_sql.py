@@ -165,9 +165,33 @@ def init_db_with_raw_sql(db):
         FROM room r
         LEFT JOIN room_member rm ON r.id = rm.room_id
         GROUP BY r.id, r.code, r.name, r.is_active, r.owner_id;
+        """,
+        # [新增] 3. 性能优化索引
+        # 为高频查询字段添加索引，加速 WHERE 子句过滤
         """
-    ]
+        CREATE INDEX idx_music_title ON musics(title);
+        """,
+        """
+        CREATE INDEX idx_music_status ON musics(status);
+        """,
+        """
+        CREATE INDEX idx_music_uploaded_at ON musics(uploaded_at);
+        """,
+        """
+        CREATE INDEX idx_user_nickname ON user(nickname);
+        """,
 
+        # [新增] 4.房间查询优化索引
+        """
+        CREATE INDEX idx_room_name ON room(name);
+        """,
+        """
+        CREATE INDEX idx_room_code ON room(code);
+        """,
+        """
+        CREATE INDEX idx_room_active ON room(is_active);
+        """,
+    ]
     try:
         # 执行所有建表语句
         with db.engine.connect() as connection:

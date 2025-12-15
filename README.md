@@ -87,7 +87,8 @@
     -- 授予管理员“施工”权限
     -- vs_admin 需要有权在 voice_share 库里建表、建存储过程、清空数据
     GRANT ALL PRIVILEGES ON voice_share.* TO 'vs_admin'@'localhost';
-    
+    SET GLOBAL log_bin_trust_function_creators = 1;
+    GRANT SUPER ON *.* TO 'vs_admin'@'localhost';
     -- 刷新权限
     FLUSH PRIVILEGES;
 ```

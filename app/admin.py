@@ -365,8 +365,14 @@ def restore_db():
             'room_playlist', 'room_member', 'system_audit_log',
             'room', 'musics', 'user'
         ]
+
+        # ================== [防死锁修复] ==================
+        # 强制提交当前默认连接的事务，释放 'user' 表的读锁
         db.session.commit()
-        db.session.close()
+        # [重要修改] 不要执行 db.session.close()，否则会导致后续 Flask 内部报错
+        # db.session.close()
+        # =================================================
+
         # --- [核心修改] 自主存取控制体现 ---
         # 显式获取 'admin_db' (vs_admin) 的连接引擎
         # 如果用默认的 db.session，就是用 vs_normal，它是没有 TRUNCATE 权限的
@@ -387,13 +393,20 @@ def restore_db():
 
                 # C. 插入新数据
                 for t in tables:
+                    # ================== [新增修复: 解决 1062 Duplicate entry] ==================
+                    # 特殊处理：在恢复审计日志表之前，再次强制清空它。
+                    # 原因：前面恢复 room_member 时，触发器(trg_room_join_audit)自动写入了新日志，
+                    # 导致表里产生了 ID=1,2... 的数据。如果不清空，会和备份文件里的 ID 冲突。
+                    if t == 'system_audit_log':
+                        conn.execute(text("TRUNCATE TABLE system_audit_log"))
+                    # ========================================================================
+
                     rows = data.get(t, [])
                     if not rows:
                         continue
 
                     # 动态构建原生 INSERT 语句
                     # 假设 rows[0] 是 {'id': 1, 'username': 'admin'...}
-                    # 我们需要生成: INSERT INTO user (id, username) VALUES (:id, :username)
                     keys = rows[0].keys()
                     columns = ', '.join(keys)
                     placeholders = ', '.join([f':{k}' for k in keys])

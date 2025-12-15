@@ -297,15 +297,14 @@ def manage_user_transaction():
 def backup_db():
     _admin_required()
     try:
-        # 定义需要备份的所有表名 (顺序建议：先父表后子表，虽然恢复时会关外键)
+        # 定义需要备份的所有表名
         tables = [
             'user', 'musics', 'room',
             'room_member', 'room_playlist', 'room_message',
             'listen_record', 'room_participation_record',
-            'system_audit_log'  # 连同审计日志一起备份
+            'system_audit_log'  # 关键：这个表只有 admin 能看
         ]
 
-        # 构造备份数据结构
         data = {
             'meta': {
                 'backup_time': str(datetime.now()),
@@ -314,24 +313,23 @@ def backup_db():
             }
         }
 
-        # 遍历查询所有表数据
-        for t in tables:
-            try:
-                # 使用 mappings() 获取字典格式结果
-                rows = db.session.execute(text(f"SELECT * FROM {t}")).mappings().all()
-                # 将 RowMapping 转为普通 dict，并利用 default=str 处理 datetime 对象
-                data[t] = [dict(row) for row in rows]
-            except Exception as table_err:
-                # 如果某个表不存在（比如审计表还没建），跳过不报错
-                print(f"Backup warning: table {t} not found or error. {table_err}")
-                data[t] = []
+        # [核心修复] 获取管理员引擎 (admin_db)，使用 vs_admin 账号连接
+        admin_engine = db.get_engine(bind='admin_db')
+
+        # 使用管理员连接执行查询
+        with admin_engine.connect() as conn:
+            for t in tables:
+                try:
+                    # 使用 conn.execute (原生连接) 而不是 db.session.execute (ORM 会话)
+                    rows = conn.execute(text(f"SELECT * FROM {t}")).mappings().all()
+                    data[t] = [dict(row) for row in rows]
+                except Exception as table_err:
+                    print(f"Backup warning: table {t} not found or error. {table_err}")
+                    data[t] = []
 
         json_str = json.dumps(data, default=str, indent=2, ensure_ascii=False)
-
-        # 生成文件名
         filename = f"voice_share_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
-        # 返回文件下载流
         return Response(
             json_str,
             mimetype="application/json",
@@ -367,7 +365,8 @@ def restore_db():
             'room_playlist', 'room_member', 'system_audit_log',
             'room', 'musics', 'user'
         ]
-
+        db.session.commit()
+        db.session.close()
         # --- [核心修改] 自主存取控制体现 ---
         # 显式获取 'admin_db' (vs_admin) 的连接引擎
         # 如果用默认的 db.session，就是用 vs_normal，它是没有 TRUNCATE 权限的

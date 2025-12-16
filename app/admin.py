@@ -6,7 +6,7 @@ from .models import Music, User, Room
 import json
 import io
 from datetime import datetime
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for, Response, send_file, jsonify
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for, Response, send_file, jsonify,current_app
 from sqlalchemy import text
 
 
@@ -498,3 +498,53 @@ def get_security_grants():
     except Exception as e:
         print(f"权限查询出错: {e}") # 打印到后台终端方便调试
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# --- [新增] 更新自动备份设置路由 ---
+from . import scheduler
+import json
+import os
+
+# --- [新增] 获取配置接口 (用于前端 AJAX 回显) ---
+@admin_bp.route("/backup/config/data", methods=["GET"])
+@login_required
+def get_backup_config_data():
+    _admin_required()
+    interval = 24
+    try:
+        config_path = os.path.join(current_app.root_path, '..', 'backup_config.json')
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                conf = json.load(f)
+                interval = conf.get('backup_interval_hours', 24)
+    except:
+        pass
+    return jsonify({'status': 'success', 'interval': interval})
+
+
+# --- [新增] 更新配置接口 ---
+@admin_bp.route("/backup/config/update", methods=["POST"])
+@login_required
+def update_backup_config_new():
+    _admin_required()
+    try:
+        hours = int(request.form.get('interval_hours', 24))
+        if hours < 1: raise ValueError("时间间隔无效")
+
+        # 1. 写文件
+        config_path = os.path.join(current_app.root_path, '..', 'backup_config.json')
+        with open(config_path, 'w') as f:
+            json.dump({'backup_interval_hours': hours}, f)
+
+        # 2. 更新调度 [核心修改点]
+        # 不要直接调用 scheduler.reschedule_job，而是先获取 job 对象
+        job = scheduler.get_job('auto_backup_job')
+        if job:
+            # 调用 Job 对象自带的 reschedule 方法
+            job.reschedule(trigger='interval', hours=hours)
+
+        flash(f"设置已保存：每 {hours} 小时自动备份一次", "success")
+    except Exception as e:
+        flash(f"保存失败: {str(e)}", "error")
+
+    return redirect(url_for('admin.db_backup'))

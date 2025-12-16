@@ -618,6 +618,47 @@ document.getElementById('btn-view-perms').addEventListener('click', async () => 
       </div>
     </div>
 
+   <div class="dashboard-card" style="border: 1px dashed #8b5cf6;">
+      <div class="card-content">
+        <h3 style="margin-top: 0; color: #1e293b;">
+            <i class="ri-time-line" style="color: #8b5cf6; margin-right: 8px;"></i> 自动备份策略
+        </h3>
+        <p style="color: #64748b; line-height: 1.6; margin-bottom: 1.5rem;">
+          后台定时执行全量备份，文件保存至服务器 <code>backups/</code> 目录。
+        </p>
+
+        <form method="post" action="{{ url_for('admin.update_backup_config_new') }}" style="margin-top: auto;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <label style="color:#64748b; font-size:0.9rem;">每</label>
+                <input type="number" id="interval-input" name="interval_hours" min="1" max="720" required
+                       style="width: 80px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center;">
+                <label style="color:#64748b; font-size:0.9rem;">小时执行一次</label>
+
+                <button type="submit" class="modern-action-btn" style="margin-left: auto; background: #8b5cf6; color: #fff; padding: 6px 1.2rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem;">
+                    保存
+                </button>
+            </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch("{{ url_for('admin.get_backup_config_data') }}")
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('interval-input').value = data.interval;
+                }
+            })
+            .catch(err => console.error("无法加载备份配置", err));
+    });
+    </script>
+
+
+
+
     <script>
     document.getElementById('btn-restore-db').addEventListener('click', async () => {
         // 1. 第一步：上传文件弹窗

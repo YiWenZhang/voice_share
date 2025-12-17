@@ -187,26 +187,44 @@ def db_backup():
 # ==============================================================================
 
 
+# app/admin.py
+
+
+
 # --- [模块：自动化] 1. 执行存储过程 (AJAX版) ---
 @admin_bp.route("/maintenance/exec", methods=["POST"])
 @login_required
 def exec_maintenance():
     _admin_required()
     try:
-        # 调用存储过程 sp_daily_maintenance
-        db.session.execute(text("CALL sp_daily_maintenance()"))
-        db.session.commit()
+        # [修改后 - 正确写法] 切换到 vs_admin 特权连接执行
+        # 1. 获取管理员引擎
+        admin_engine = db.get_engine(bind='admin_db')
+
+        # 2. 使用原生连接执行
+        with admin_engine.connect() as conn:
+            # 开启事务（虽然存储过程内部可能有逻辑，但最好在调用层也明确）
+            trans = conn.begin()
+            try:
+                conn.execute(text("CALL sp_daily_maintenance()"))
+                trans.commit()
+            except Exception as e:
+                trans.rollback()
+                raise e
+
         # [修改] 不再用 flash+redirect，而是返回 JSON
         return jsonify({
             "status": "success",
             "message": "每日维护存储过程执行成功！\n已清理 1 天前的过期记录与僵尸房间。"
         })
     except Exception as e:
-        db.session.rollback()
+        # 注意：这里不需要 db.session.rollback()，因为我们用的是 admin_engine 的 conn
+        print(f"执行维护脚本失败: {e}")
         return jsonify({
             "status": "error",
             "message": f"执行失败: {str(e)}"
         }), 500
+
 
 
 # --- [模块：自动化] 2. 查看审计日志 ---

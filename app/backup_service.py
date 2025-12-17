@@ -16,7 +16,6 @@ def execute_save_backup():
         'listen_record', 'room_participation_record',
         'system_audit_log'
     ]
-
     data = {
         'meta': {
             'backup_time': str(datetime.now()),
